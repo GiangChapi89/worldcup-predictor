@@ -8,13 +8,17 @@
     <!-- CSS -->
     <link rel="stylesheet" href="css/style.css">
     
+    <!-- Font Awesome cho icon mắt -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="js/toggle-password.js"></script>
 </head>
 <body>
-    <!-- Navigation - Nổi bật nút Đăng Nhập -->
+    <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="nav-left">
@@ -27,12 +31,10 @@
                     <li><a href="admin.html" id="adminLink" style="display:none;">⚙️ Admin</a></li>
                 </ul>
                 <div id="userSection">
-                    <!-- Thông tin user khi đã đăng nhập -->
                     <div id="userInfo" style="display: none;">
                         <span id="userName" class="user-name-display"></span>
                         <button id="logoutBtn" class="btn-logout">🚪 Đăng Xuất</button>
                     </div>
-                    <!-- Nút Đăng Nhập - Nổi bật -->
                     <div id="loginSection">
                         <button id="loginBtn" class="btn-login-main">🔑 Đăng Nhập</button>
                     </div>
@@ -43,7 +45,6 @@
 
     <!-- Main Content -->
     <main class="container">
-        <!-- Welcome Message -->
         <div id="welcomeMessage" style="display: none;">
             <div class="welcome-card">
                 <h2>👋 Chào mừng, <span id="displayName"></span>!</h2>
@@ -51,7 +52,6 @@
             </div>
         </div>
 
-        <!-- Matches Section -->
         <section id="matches">
             <h2>📅 Lịch Thi Đấu</h2>
             <div id="matchList" class="match-grid">
@@ -59,7 +59,6 @@
             </div>
         </section>
 
-        <!-- Statistics Section -->
         <section id="statistics">
             <h2>🏆 Bảng Xếp Hạng</h2>
             <div id="rankingTable">
@@ -69,21 +68,18 @@
         </section>
     </main>
 
-    <!-- Login Modal - Đơn giản, chỉ có Google và Email -->
+    <!-- Login Modal -->
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2 style="text-align: center; margin-bottom: 25px;">🔐 Đăng Nhập</h2>
             
-            <!-- Các phương thức đăng nhập -->
             <div class="auth-options">
-                <!-- Nút Google nổi bật -->
                 <button id="googleLogin" class="auth-btn google">
                     <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google">
                     Đăng nhập với Google
                 </button>
                 
-                <!-- Nút Email -->
                 <button id="emailLogin" class="auth-btn email">
                     📧 Đăng nhập với Email
                 </button>
@@ -97,7 +93,12 @@
                 </div>
                 <div class="form-group">
                     <label>Mật khẩu</label>
-                    <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
+                        <button type="button" class="toggle-password" onclick="togglePassword('loginPassword', this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <button id="submitLogin" class="auth-submit">Đăng Nhập</button>
                 <p class="auth-switch">
@@ -117,7 +118,13 @@
                 </div>
                 <div class="form-group">
                     <label>Mật khẩu</label>
-                    <input type="password" id="registerPassword" placeholder="Ít nhất 6 ký tự" class="auth-input">
+                    <div class="password-wrapper">
+                        <input type="password" id="registerPassword" placeholder="Ít nhất 6 ký tự" class="auth-input">
+                        <button type="button" class="toggle-password" onclick="togglePassword('registerPassword', this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <small style="color: #666; font-size: 12px; margin-top: 5px;">Mật khẩu phải có ít nhất 6 ký tự</small>
                 </div>
                 <button id="submitRegister" class="auth-submit">Đăng Ký</button>
                 <p class="auth-switch">
@@ -134,5 +141,23 @@
     <script src="js/predictions.js"></script>
     <script src="js/statistics.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- Script toggle password -->
+    <script>
+        function togglePassword(inputId, button) {
+            const input = document.getElementById(inputId);
+            const icon = button.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
 </body>
 </html>

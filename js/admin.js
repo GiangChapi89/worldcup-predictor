@@ -2,36 +2,33 @@
 console.log('🔍 Admin.js loaded');
 
 // ============================================
-// DANH SÁCH ADMIN EMAIL - THÊM EMAIL CỦA BẠN
+// DANH SÁCH ADMIN - THÊM EMAIL CỦA BẠN VÀO ĐÂY
 // ============================================
 const ADMIN_EMAILS = [
-    'songdaytronglong@gmail.com',  // ✅ Email của bạn
+    'songdaytronglong@gmail.com',
     'admin@gmail.com'
 ];
 
 // ============================================
-// KIỂM TRA QUYỀN ADMIN - FIX LỖI
+// KIỂM TRA QUYỀN ADMIN
 // ============================================
 async function checkAdmin() {
     console.log('🔍 Checking admin permissions...');
     
     try {
-        // ĐỢI AUTH LOAD - QUAN TRỌNG
-        await new Promise((resolve) => {
-            const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+        // Đợi auth load
+        const user = await new Promise((resolve) => {
+            const unsubscribe = firebase.auth().onAuthStateChanged(u => {
                 unsubscribe();
-                resolve(user);
+                resolve(u);
             });
         });
 
-        const user = firebase.auth().currentUser;
         console.log('📧 Current user:', user?.email);
 
-        // Nếu chưa đăng nhập
         if (!user) {
-            console.warn('⚠️ Chưa đăng nhập');
             document.body.innerHTML = `
-                <div style="text-align:center;padding:50px;font-family:Arial;">
+                <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
                     <h2>🔐 Vui lòng đăng nhập</h2>
                     <p style="margin:20px 0;color:#666;">Bạn cần đăng nhập để truy cập trang admin</p>
                     <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;font-weight:600;">← Về trang chủ</a>
@@ -40,11 +37,9 @@ async function checkAdmin() {
             return false;
         }
 
-        // Kiểm tra email admin
         if (!ADMIN_EMAILS.includes(user.email)) {
-            console.warn('⚠️ Không có quyền admin:', user.email);
             document.body.innerHTML = `
-                <div style="text-align:center;padding:50px;font-family:Arial;">
+                <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
                     <h2>⛔ Không có quyền truy cập</h2>
                     <p style="margin:20px 0;color:#666;">Tài khoản <strong>${user.email}</strong> không có quyền admin</p>
                     <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;font-weight:600;">← Về trang chủ</a>
@@ -53,10 +48,9 @@ async function checkAdmin() {
             return false;
         }
 
-        // ✅ LÀ ADMIN - HIỂN THỊ TRANG
+        // ✅ Admin
         console.log('✅ Admin verified:', user.email);
         
-        // Hiển thị tên admin
         const nameEl = document.getElementById('adminName');
         if (nameEl) {
             nameEl.textContent = '👤 ' + (user.displayName || user.email);
@@ -78,9 +72,9 @@ async function checkAdmin() {
         return true;
         
     } catch (error) {
-        console.error('❌ Lỗi kiểm tra admin:', error);
+        console.error('❌ Lỗi:', error);
         document.body.innerHTML = `
-            <div style="text-align:center;padding:50px;font-family:Arial;">
+            <div style="text-align:center;padding:50px;font-family:Arial,sans-serif;">
                 <h2>❌ Lỗi</h2>
                 <p style="margin:20px 0;color:red;">${error.message}</p>
                 <button onclick="location.reload()" style="padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">🔄 Thử lại</button>
@@ -93,14 +87,15 @@ async function checkAdmin() {
 }
 
 // ============================================
-// CÁC HÀM LOAD DỮ LIỆU
+// LOAD DASHBOARD
 // ============================================
 async function loadDashboard() {
     try {
+        const db = firebase.firestore();
         const [usersSnap, matchesSnap, predSnap] = await Promise.all([
-            firebase.firestore().collection('users').get(),
-            firebase.firestore().collection('matches').get(),
-            firebase.firestore().collection('predictions').get()
+            db.collection('users').get(),
+            db.collection('matches').get(),
+            db.collection('predictions').get()
         ]);
         
         document.getElementById('totalUsers').textContent = usersSnap.size || 0;
@@ -118,6 +113,9 @@ async function loadDashboard() {
     }
 }
 
+// ============================================
+// LOAD MATCHES
+// ============================================
 async function loadMatches() {
     const container = document.getElementById('matchListAdmin');
     if (!container) return;
@@ -125,7 +123,8 @@ async function loadMatches() {
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await firebase.firestore().collection('matches')
+        const db = firebase.firestore();
+        const snapshot = await db.collection('matches')
             .orderBy('date')
             .get();
         
@@ -171,6 +170,9 @@ async function loadMatches() {
     }
 }
 
+// ============================================
+// LOAD USERS
+// ============================================
 async function loadUsers() {
     const container = document.getElementById('userList');
     if (!container) return;
@@ -178,7 +180,8 @@ async function loadUsers() {
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await firebase.firestore().collection('users')
+        const db = firebase.firestore();
+        const snapshot = await db.collection('users')
             .orderBy('totalPoints', 'desc')
             .get();
         
@@ -216,6 +219,9 @@ async function loadUsers() {
     }
 }
 
+// ============================================
+// LOAD PREDICTIONS
+// ============================================
 async function loadPredictions() {
     const container = document.getElementById('predictionList');
     if (!container) return;
@@ -223,7 +229,8 @@ async function loadPredictions() {
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await firebase.firestore().collection('predictions')
+        const db = firebase.firestore();
+        const snapshot = await db.collection('predictions')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .get();
@@ -233,31 +240,39 @@ async function loadPredictions() {
             return;
         }
         
-        let html = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
-            <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
-                <th style="padding:12px 16px;text-align:left;">User</th>
-                <th style="padding:12px 16px;text-align:left;">Trận</th>
-                <th style="padding:12px 16px;text-align:center;">Dự đoán</th>
-                <th style="padding:12px 16px;text-align:center;">Điểm</th>
-            </tr></thead><tbody>`;
+        let html = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+                    <thead>
+                        <tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+                            <th style="padding:12px 16px;text-align:left;">User</th>
+                            <th style="padding:12px 16px;text-align:left;">Trận</th>
+                            <th style="padding:12px 16px;text-align:center;">Dự đoán</th>
+                            <th style="padding:12px 16px;text-align:center;">Điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
         
         for (const doc of snapshot.docs) {
             const pred = doc.data();
             let matchName = 'N/A';
             try {
-                const matchDoc = await firebase.firestore().collection('matches').doc(pred.matchId).get();
+                const matchDoc = await db.collection('matches').doc(pred.matchId).get();
                 if (matchDoc.exists) {
                     const m = matchDoc.data();
                     matchName = `${m.homeTeam} vs ${m.awayTeam}`;
                 }
             } catch (e) {}
             
-            html += `<tr style="border-bottom:1px solid #f0f0f0;">
-                <td style="padding:10px 16px;">${pred.userName || 'N/A'}</td>
-                <td style="padding:10px 16px;">${matchName}</td>
-                <td style="padding:10px 16px;text-align:center;">${pred.homeScore} - ${pred.awayScore}</td>
-                <td style="padding:10px 16px;text-align:center;">${pred.points || 0}</td>
-            </tr>`;
+            html += `
+                <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:10px 16px;">${pred.userName || 'N/A'}</td>
+                    <td style="padding:10px 16px;">${matchName}</td>
+                    <td style="padding:10px 16px;text-align:center;">${pred.homeScore} - ${pred.awayScore}</td>
+                    <td style="padding:10px 16px;text-align:center;">${pred.points || 0}</td>
+                </tr>
+            `;
         }
         
         html += '</tbody></table></div>';
@@ -269,6 +284,9 @@ async function loadPredictions() {
     }
 }
 
+// ============================================
+// LOAD LOGS
+// ============================================
 async function loadLogs() {
     const container = document.getElementById('logList');
     if (!container) return;
@@ -276,7 +294,8 @@ async function loadLogs() {
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await firebase.firestore().collection('audit_logs')
+        const db = firebase.firestore();
+        const snapshot = await db.collection('audit_logs')
             .orderBy('timestamp', 'desc')
             .limit(20)
             .get();
@@ -286,22 +305,33 @@ async function loadLogs() {
             return;
         }
         
-        let html = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
-            <thead><tr style="background:#333;color:white;">
-                <th style="padding:12px 16px;text-align:left;">Thời gian</th>
-                <th style="padding:12px 16px;text-align:left;">Admin</th>
-                <th style="padding:12px 16px;text-align:left;">Hành động</th>
-            </tr></thead><tbody>`;
+        let html = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+                    <thead>
+                        <tr style="background:#333;color:white;">
+                            <th style="padding:12px 16px;text-align:left;">Thời gian</th>
+                            <th style="padding:12px 16px;text-align:left;">Admin</th>
+                            <th style="padding:12px 16px;text-align:left;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
         
         snapshot.forEach(doc => {
             const log = doc.data();
-            const time = log.timestamp?.toDate?.()?.toLocaleString() || 'N/A';
+            let time = 'N/A';
+            if (log.timestamp && log.timestamp.toDate) {
+                time = log.timestamp.toDate().toLocaleString();
+            }
             
-            html += `<tr style="border-bottom:1px solid #f0f0f0;">
-                <td style="padding:10px 16px;font-size:13px;">${time}</td>
-                <td style="padding:10px 16px;">${log.adminName || log.adminEmail || 'N/A'}</td>
-                <td style="padding:10px 16px;">${log.action || 'N/A'}</td>
-            </tr>`;
+            html += `
+                <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:10px 16px;font-size:13px;">${time}</td>
+                    <td style="padding:10px 16px;">${log.adminName || log.adminEmail || 'N/A'}</td>
+                    <td style="padding:10px 16px;">${log.action || 'N/A'}</td>
+                </tr>
+            `;
         });
         
         html += '</tbody></table></div>';
@@ -318,6 +348,7 @@ async function loadLogs() {
 // ============================================
 function showAddMatchForm() {
     const form = document.getElementById('matchForm');
+    if (!form) return;
     form.style.display = 'block';
     document.getElementById('matchId').value = '';
     document.getElementById('homeTeam').value = '';
@@ -332,7 +363,10 @@ function showAddMatchForm() {
 }
 
 function cancelMatchForm() {
-    document.getElementById('matchForm').style.display = 'none';
+    const form = document.getElementById('matchForm');
+    if (form) {
+        form.style.display = 'none';
+    }
 }
 
 async function saveMatch() {
@@ -356,13 +390,14 @@ async function saveMatch() {
     }
     
     try {
+        const db = firebase.firestore();
         if (matchId) {
-            await firebase.firestore().collection('matches').doc(matchId).update(data);
+            await db.collection('matches').doc(matchId).update(data);
             alert('✅ Cập nhật trận đấu thành công!');
         } else {
             data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             data.createdBy = firebase.auth().currentUser.uid;
-            await firebase.firestore().collection('matches').add(data);
+            await db.collection('matches').add(data);
             alert('✅ Thêm trận đấu thành công!');
         }
         cancelMatchForm();
@@ -376,7 +411,8 @@ async function saveMatch() {
 
 async function editMatch(matchId) {
     try {
-        const doc = await firebase.firestore().collection('matches').doc(matchId).get();
+        const db = firebase.firestore();
+        const doc = await db.collection('matches').doc(matchId).get();
         if (doc.exists) {
             const data = doc.data();
             showAddMatchForm();
@@ -400,7 +436,8 @@ async function deleteMatch(matchId) {
     if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?')) return;
     
     try {
-        await firebase.firestore().collection('matches').doc(matchId).delete();
+        const db = firebase.firestore();
+        await db.collection('matches').doc(matchId).delete();
         alert('✅ Xóa trận đấu thành công!');
         await loadMatches();
         await loadDashboard();
@@ -414,16 +451,20 @@ async function deleteMatch(matchId) {
 // TAB SWITCHING
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            tabs.forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
             this.classList.add('active');
             const tabId = this.dataset.tab;
             const content = document.getElementById(tabId);
-            if (content) content.classList.add('active');
+            if (content) {
+                content.classList.add('active');
+            }
             
+            // Load data khi chuyển tab
             switch(tabId) {
                 case 'matches': loadMatches(); break;
                 case 'users': loadUsers(); break;
@@ -446,10 +487,9 @@ function logout() {
 }
 
 // ============================================
-// INIT - GỌI KHI TRANG LOAD
+// INIT
 // ============================================
-console.log('🔄 DOM loaded, checking admin...');
-// Đợi DOM load xong rồi mới kiểm tra
+console.log('🔄 Initializing admin page...');
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', checkAdmin);
 } else {

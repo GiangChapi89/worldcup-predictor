@@ -9,11 +9,9 @@ class AuthManager {
         // Theo dõi trạng thái đăng nhập
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Kiểm tra xem user đã có trong Firestore chưa
                 const userRef = db.collection('users').doc(user.uid);
                 const doc = await userRef.get();
                 if (!doc.exists) {
-                    // Nếu chưa, tạo mới với điểm số 0
                     await userRef.set({
                         name: user.displayName || user.email || 'Người dùng',
                         email: user.email || '',
@@ -27,12 +25,10 @@ class AuthManager {
                     }, { merge: true });
                     console.log('✅ Đã tạo user mới:', user.uid);
                 } else {
-                    // Cập nhật lastLogin
                     await userRef.update({
                         lastLogin: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
-                // Cập nhật UI
                 this.showUserInfo(user);
                 this.loadUserData(user);
             } else {
@@ -78,19 +74,52 @@ class AuthManager {
 
         document.getElementById('submitRegister').addEventListener('click', () => this.register());
 
-        // Chuyển về login
         document.getElementById('switchToLogin').addEventListener('click', (e) => {
             e.preventDefault();
             document.getElementById('emailLoginForm').style.display = 'block';
             document.getElementById('registerForm').style.display = 'none';
         });
 
-        // Enter key support
-        document.getElementById('loginEmail').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.loginWithEmail();
+        // Enter key support - CẬP NHẬT với toggle password
+        const loginEmail = document.getElementById('loginEmail');
+        const loginPassword = document.getElementById('loginPassword');
+        const registerName = document.getElementById('registerName');
+        const registerEmail = document.getElementById('registerEmail');
+        const registerPassword = document.getElementById('registerPassword');
+
+        loginEmail.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loginPassword.focus();
+            }
         });
-        document.getElementById('loginPassword').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.loginWithEmail();
+        
+        loginPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.loginWithEmail();
+            }
+        });
+
+        registerName.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                registerEmail.focus();
+            }
+        });
+        
+        registerEmail.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                registerPassword.focus();
+            }
+        });
+        
+        registerPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.register();
+            }
         });
     }
 
@@ -102,6 +131,22 @@ class AuthManager {
         document.getElementById('registerName').value = '';
         document.getElementById('registerEmail').value = '';
         document.getElementById('registerPassword').value = '';
+        
+        // Reset password visibility
+        const passwordInputs = document.querySelectorAll('.password-wrapper input[type="password"]');
+        passwordInputs.forEach(input => {
+            const wrapper = input.closest('.password-wrapper');
+            if (wrapper) {
+                const toggleBtn = wrapper.querySelector('.toggle-password');
+                if (toggleBtn) {
+                    const icon = toggleBtn.querySelector('i');
+                    if (icon) {
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                }
+            }
+        });
     }
 
     async loginWithGoogle() {
@@ -113,7 +158,6 @@ class AuthManager {
         } catch (error) {
             console.error('❌ Lỗi đăng nhập Google:', error);
             if (error.code === 'auth/popup-closed-by-user') {
-                // Người dùng đóng popup, không cần thông báo
                 return;
             }
             alert('❌ Đăng nhập thất bại: ' + error.message);
@@ -199,13 +243,11 @@ class AuthManager {
         document.getElementById('userName').textContent = displayName;
         document.getElementById('welcomeMessage').style.display = 'block';
         
-        // Hiển thị link admin nếu là admin
-        const adminEmails = ['admin@gmail.com', 'songdaytronglong@gmail.com'];
+        const adminEmails = ['admin@gmail.com', 'your-email@gmail.com', 'songdaytronglong@gmail.com'];
         if (adminEmails.includes(user.email)) {
             document.getElementById('adminLink').style.display = 'inline-block';
         }
         
-        // Enable predictions
         this.enablePrediction(true);
     }
 
@@ -225,7 +267,6 @@ class AuthManager {
         const modal = document.getElementById('loginModal');
         modal.style.display = 'block';
         this.resetForms();
-        // Mặc định hiển thị form email
         document.getElementById('emailLoginForm').style.display = 'block';
     }
 
