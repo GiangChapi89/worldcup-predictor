@@ -1,0 +1,28 @@
+{
+  "name": "worldcup-predictor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "json-server --watch db.json",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GiangChapi89/worldcup-predictor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/GiangChapi89/worldcup-predictor/issues"
+  },
+  "homepage": "https://github.com/GiangChapi89/worldcup-predictor#readme",
+  "dependencies": {
+    "json-server": "^1.0.0-beta.15"
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

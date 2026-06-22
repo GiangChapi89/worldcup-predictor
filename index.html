@@ -5,33 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dự Đoán World Cup 2026</title>
     <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Thêm Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+    <!-- Thanh điều hướng với thông tin user -->
     <nav class="navbar">
         <div class="container">
-            <h1>⚽ Dự Đoán World Cup 2026</h1>
-            <ul>
-                <li><a href="#matches">Trận Đấu</a></li>
-                <li><a href="#predictions">Dự Đoán</a></li>
-                <li><a href="#statistics">Bảng Xếp Hạng</a></li>
-            </ul>
+            <div class="nav-left">
+                <h1>⚽ Dự Đoán World Cup 2026</h1>
+            </div>
+            <div class="nav-right">
+                <ul>
+                    <li><a href="#matches">Trận Đấu</a></li>
+                    <li><a href="#predictions">Dự Đoán</a></li>
+                    <li><a href="#statistics">Bảng Xếp Hạng</a></li>
+                </ul>
+                <!-- Phần hiển thị user -->
+                <div id="userSection">
+                    <div id="userInfo" style="display: none;">
+                        <span id="userName"></span>
+                        <button id="logoutBtn" class="btn-logout">Đăng Xuất</button>
+                    </div>
+                    <div id="loginSection">
+                        <button id="loginBtn" class="btn-login">Đăng Nhập</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </nav>
 
     <main class="container">
-        <!-- Danh sách trận đấu -->
+        <!-- Phần chào mừng -->
+        <div id="welcomeMessage" style="display: none;">
+            <div class="welcome-card">
+                <h2>Chào mừng, <span id="displayName"></span>!</h2>
+                <p>Bắt đầu dự đoán các trận đấu World Cup 2026 ngay nào!</p>
+            </div>
+        </div>
+
+        <!-- Các section khác giữ nguyên -->
         <section id="matches">
             <h2>Lịch Thi Đấu</h2>
             <div id="matchList" class="match-grid"></div>
         </section>
 
-        <!-- Dự đoán -->
         <section id="predictions">
             <h2>Dự Đoán Tỷ Số</h2>
-            <div id="predictionForm"></div>
+            <div id="predictionForm">
+                <p class="info-message">Vui lòng đăng nhập để dự đoán!</p>
+            </div>
         </section>
 
-        <!-- Bảng xếp hạng -->
         <section id="statistics">
             <h2>Bảng Xếp Hạng</h2>
             <div id="rankingTable"></div>
@@ -39,6 +67,43 @@
         </section>
     </main>
 
+    <!-- Modal đăng nhập -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Đăng Nhập</h2>
+            <div id="firebaseui-auth-container"></div>
+            <div class="auth-options">
+                <button id="googleLogin" class="auth-btn google">
+                    <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google">
+                    Đăng nhập với Google
+                </button>
+                <button id="emailLogin" class="auth-btn email">
+                    📧 Đăng nhập với Email
+                </button>
+            </div>
+            <div id="emailLoginForm" style="display: none;">
+                <input type="email" id="loginEmail" placeholder="Email" class="auth-input">
+                <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
+                <button id="submitLogin" class="auth-submit">Đăng Nhập</button>
+                <p class="auth-switch">
+                    Chưa có tài khoản? <a href="#" id="switchToRegister">Đăng ký</a>
+                </p>
+            </div>
+            <div id="registerForm" style="display: none;">
+                <input type="text" id="registerName" placeholder="Tên hiển thị" class="auth-input">
+                <input type="email" id="registerEmail" placeholder="Email" class="auth-input">
+                <input type="password" id="registerPassword" placeholder="Mật khẩu" class="auth-input">
+                <button id="submitRegister" class="auth-submit">Đăng Ký</button>
+                <p class="auth-switch">
+                    Đã có tài khoản? <a href="#" id="switchToLogin">Đăng nhập</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
     <script src="js/matches.js"></script>
     <script src="js/predictions.js"></script>
