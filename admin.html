@@ -12,24 +12,25 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+    <!-- Navbar -->
     <nav class="navbar admin-nav">
         <div class="container">
-            <h1>⚙️ Admin Panel - World Cup 2026</h1>
+            <h1>⚙️ Admin Panel</h1>
             <div>
-                <span id="adminName" style="color:white; margin-right:15px;"></span>
-                <button onclick="logout()" class="btn-logout">🚪 Đăng Xuất</button>
-                <a href="index.html" class="btn-back" style="margin-left:10px;">← Về trang chính</a>
+                <span id="adminName" style="color:white;margin-right:15px;"></span>
+                <button onclick="logout()" class="btn-logout">Đăng Xuất</button>
+                <a href="index.html" style="color:white;margin-left:15px;">← Về trang chính</a>
             </div>
         </div>
     </nav>
 
-    <div class="container admin-container">
+    <!-- Container chính - Ẩn ban đầu -->
+    <div class="container admin-container" style="display:none;">
         <!-- Tabs -->
         <div class="admin-tabs">
             <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
-            <button class="tab-btn" data-tab="matches">⚽ Quản Lý Trận Đấu</button>
-            <button class="tab-btn" data-tab="users">👥 Quản Lý Người Dùng</button>
-            <button class="tab-btn" data-tab="predictions">📝 Dự Đoán</button>
+            <button class="tab-btn" data-tab="matches">⚽ Trận Đấu</button>
+            <button class="tab-btn" data-tab="users">👥 Người Dùng</button>
             <button class="tab-btn" data-tab="logs">📋 Lịch Sử</button>
         </div>
 
@@ -44,7 +45,7 @@
 
         <!-- Quản lý trận đấu -->
         <div id="matches" class="tab-content">
-            <div class="admin-actions">
+            <div style="margin-bottom:20px;">
                 <button onclick="showAddMatchForm()" class="btn-primary">➕ Thêm Trận Đấu</button>
             </div>
             
@@ -82,8 +83,6 @@
                             <option value="1">1 (Chấp 1 trái)</option>
                             <option value="1.25">1.25 (Chấp 1 1/4)</option>
                             <option value="1.5">1.5 (Chấp 1 1/2)</option>
-                            <option value="1.75">1.75 (Chấp 1 3/4)</option>
-                            <option value="2">2 (Chấp 2 trái)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -107,25 +106,21 @@
                 </div>
             </div>
 
-            <div id="matchListAdmin"></div>
+            <div id="matchListAdmin"><p>Đang tải...</p></div>
         </div>
 
-        <!-- Quản lý người dùng -->
+        <!-- Người dùng -->
         <div id="users" class="tab-content">
-            <div id="userList"></div>
-        </div>
-
-        <!-- Dự đoán -->
-        <div id="predictions" class="tab-content">
-            <div id="predictionList"></div>
+            <div id="userList"><p>Đang tải...</p></div>
         </div>
 
         <!-- Lịch sử -->
         <div id="logs" class="tab-content">
-            <div id="logList"></div>
+            <div id="logList"><p>Đang tải...</p></div>
         </div>
     </div>
 
+    <!-- Script -->
     <script src="js/firebase-config.js"></script>
     <script src="js/admin.js"></script>
 </body>
