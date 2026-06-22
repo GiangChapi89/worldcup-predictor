@@ -2,50 +2,73 @@
 console.log('🔍 Admin.js loaded');
 
 // ============================================
-// DANH SÁCH ADMIN
+// DANH SÁCH ADMIN EMAIL - THÊM EMAIL CỦA BẠN
 // ============================================
 const ADMIN_EMAILS = [
-    'songdaytronglong@gmail.com',
+    'songdaytronglong@gmail.com',  // ✅ Email của bạn
     'admin@gmail.com'
 ];
 
 // ============================================
-// KIỂM TRA QUYỀN ADMIN
+// KIỂM TRA QUYỀN ADMIN - FIX LỖI
 // ============================================
 async function checkAdmin() {
     console.log('🔍 Checking admin permissions...');
     
     try {
-        const user = auth.currentUser;
+        // ĐỢI AUTH LOAD - QUAN TRỌNG
+        await new Promise((resolve) => {
+            const unsubscribe = firebase.auth().onAuthStateChanged(user => {
+                unsubscribe();
+                resolve(user);
+            });
+        });
+
+        const user = firebase.auth().currentUser;
         console.log('📧 Current user:', user?.email);
 
+        // Nếu chưa đăng nhập
         if (!user) {
+            console.warn('⚠️ Chưa đăng nhập');
             document.body.innerHTML = `
-                <div style="text-align:center;padding:50px;">
+                <div style="text-align:center;padding:50px;font-family:Arial;">
                     <h2>🔐 Vui lòng đăng nhập</h2>
-                    <p style="margin:20px 0;">Bạn cần đăng nhập để truy cập trang admin</p>
-                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;">← Về trang chủ</a>
+                    <p style="margin:20px 0;color:#666;">Bạn cần đăng nhập để truy cập trang admin</p>
+                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;font-weight:600;">← Về trang chủ</a>
                 </div>
             `;
             return false;
         }
 
+        // Kiểm tra email admin
         if (!ADMIN_EMAILS.includes(user.email)) {
+            console.warn('⚠️ Không có quyền admin:', user.email);
             document.body.innerHTML = `
-                <div style="text-align:center;padding:50px;">
+                <div style="text-align:center;padding:50px;font-family:Arial;">
                     <h2>⛔ Không có quyền truy cập</h2>
-                    <p style="margin:20px 0;">Tài khoản <strong>${user.email}</strong> không có quyền admin</p>
-                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;">← Về trang chủ</a>
+                    <p style="margin:20px 0;color:#666;">Tài khoản <strong>${user.email}</strong> không có quyền admin</p>
+                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;font-weight:600;">← Về trang chủ</a>
                 </div>
             `;
             return false;
         }
 
-        // ✅ Admin
+        // ✅ LÀ ADMIN - HIỂN THỊ TRANG
         console.log('✅ Admin verified:', user.email);
-        document.getElementById('adminName').textContent = '👤 ' + (user.displayName || user.email);
         
-        // Load data
+        // Hiển thị tên admin
+        const nameEl = document.getElementById('adminName');
+        if (nameEl) {
+            nameEl.textContent = '👤 ' + (user.displayName || user.email);
+        }
+        
+        // Hiển thị container
+        const container = document.querySelector('.admin-container');
+        if (container) {
+            container.style.display = 'block';
+        }
+        
+        // Load dữ liệu
         await loadDashboard();
         await loadMatches();
         await loadUsers();
@@ -55,27 +78,35 @@ async function checkAdmin() {
         return true;
         
     } catch (error) {
-        console.error('❌ Error:', error);
+        console.error('❌ Lỗi kiểm tra admin:', error);
+        document.body.innerHTML = `
+            <div style="text-align:center;padding:50px;font-family:Arial;">
+                <h2>❌ Lỗi</h2>
+                <p style="margin:20px 0;color:red;">${error.message}</p>
+                <button onclick="location.reload()" style="padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">🔄 Thử lại</button>
+                <br><br>
+                <a href="index.html" style="color:#667eea;">← Về trang chủ</a>
+            </div>
+        `;
         return false;
     }
 }
 
 // ============================================
-// LOAD DASHBOARD
+// CÁC HÀM LOAD DỮ LIỆU
 // ============================================
 async function loadDashboard() {
     try {
         const [usersSnap, matchesSnap, predSnap] = await Promise.all([
-            db.collection('users').get(),
-            db.collection('matches').get(),
-            db.collection('predictions').get()
+            firebase.firestore().collection('users').get(),
+            firebase.firestore().collection('matches').get(),
+            firebase.firestore().collection('predictions').get()
         ]);
         
-        document.getElementById('totalUsers').textContent = usersSnap.size;
-        document.getElementById('totalMatches').textContent = matchesSnap.size;
-        document.getElementById('totalPredictions').textContent = predSnap.size;
+        document.getElementById('totalUsers').textContent = usersSnap.size || 0;
+        document.getElementById('totalMatches').textContent = matchesSnap.size || 0;
+        document.getElementById('totalPredictions').textContent = predSnap.size || 0;
         
-        // Tính tổng điểm
         let totalPoints = 0;
         usersSnap.forEach(doc => {
             totalPoints += doc.data().totalPoints || 0;
@@ -87,15 +118,14 @@ async function loadDashboard() {
     }
 }
 
-// ============================================
-// LOAD MATCHES
-// ============================================
 async function loadMatches() {
     const container = document.getElementById('matchListAdmin');
-    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await db.collection('matches')
+        const snapshot = await firebase.firestore().collection('matches')
             .orderBy('date')
             .get();
         
@@ -141,15 +171,14 @@ async function loadMatches() {
     }
 }
 
-// ============================================
-// LOAD USERS
-// ============================================
 async function loadUsers() {
     const container = document.getElementById('userList');
-    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await db.collection('users')
+        const snapshot = await firebase.firestore().collection('users')
             .orderBy('totalPoints', 'desc')
             .get();
         
@@ -175,7 +204,6 @@ async function loadUsers() {
                             ${user.isActive !== false ? '✅ Active' : '🔒 Locked'}
                         </span>
                         <span>⭐ ${user.totalPoints || 0}</span>
-                        <span>🎯 ${user.correctPredictions || 0}/${user.totalPredictions || 0}</span>
                     </div>
                 </div>
             `;
@@ -188,15 +216,14 @@ async function loadUsers() {
     }
 }
 
-// ============================================
-// LOAD PREDICTIONS
-// ============================================
 async function loadPredictions() {
     const container = document.getElementById('predictionList');
-    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await db.collection('predictions')
+        const snapshot = await firebase.firestore().collection('predictions')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .get();
@@ -206,39 +233,31 @@ async function loadPredictions() {
             return;
         }
         
-        let html = `
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
-                    <thead>
-                        <tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
-                            <th style="padding:12px 16px;text-align:left;">User</th>
-                            <th style="padding:12px 16px;text-align:left;">Trận</th>
-                            <th style="padding:12px 16px;text-align:center;">Dự đoán</th>
-                            <th style="padding:12px 16px;text-align:center;">Điểm</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
+        let html = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+            <thead><tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+                <th style="padding:12px 16px;text-align:left;">User</th>
+                <th style="padding:12px 16px;text-align:left;">Trận</th>
+                <th style="padding:12px 16px;text-align:center;">Dự đoán</th>
+                <th style="padding:12px 16px;text-align:center;">Điểm</th>
+            </tr></thead><tbody>`;
         
         for (const doc of snapshot.docs) {
             const pred = doc.data();
             let matchName = 'N/A';
             try {
-                const matchDoc = await db.collection('matches').doc(pred.matchId).get();
+                const matchDoc = await firebase.firestore().collection('matches').doc(pred.matchId).get();
                 if (matchDoc.exists) {
                     const m = matchDoc.data();
                     matchName = `${m.homeTeam} vs ${m.awayTeam}`;
                 }
             } catch (e) {}
             
-            html += `
-                <tr style="border-bottom:1px solid #f0f0f0;">
-                    <td style="padding:10px 16px;">${pred.userName || 'N/A'}</td>
-                    <td style="padding:10px 16px;">${matchName}</td>
-                    <td style="padding:10px 16px;text-align:center;">${pred.homeScore} - ${pred.awayScore}</td>
-                    <td style="padding:10px 16px;text-align:center;">${pred.points || 0}</td>
-                </tr>
-            `;
+            html += `<tr style="border-bottom:1px solid #f0f0f0;">
+                <td style="padding:10px 16px;">${pred.userName || 'N/A'}</td>
+                <td style="padding:10px 16px;">${matchName}</td>
+                <td style="padding:10px 16px;text-align:center;">${pred.homeScore} - ${pred.awayScore}</td>
+                <td style="padding:10px 16px;text-align:center;">${pred.points || 0}</td>
+            </tr>`;
         }
         
         html += '</tbody></table></div>';
@@ -250,15 +269,14 @@ async function loadPredictions() {
     }
 }
 
-// ============================================
-// LOAD LOGS
-// ============================================
 async function loadLogs() {
     const container = document.getElementById('logList');
-    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
-        const snapshot = await db.collection('audit_logs')
+        const snapshot = await firebase.firestore().collection('audit_logs')
             .orderBy('timestamp', 'desc')
             .limit(20)
             .get();
@@ -268,30 +286,22 @@ async function loadLogs() {
             return;
         }
         
-        let html = `
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
-                    <thead>
-                        <tr style="background:#333;color:white;">
-                            <th style="padding:12px 16px;text-align:left;">Thời gian</th>
-                            <th style="padding:12px 16px;text-align:left;">Admin</th>
-                            <th style="padding:12px 16px;text-align:left;">Hành động</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
+        let html = `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+            <thead><tr style="background:#333;color:white;">
+                <th style="padding:12px 16px;text-align:left;">Thời gian</th>
+                <th style="padding:12px 16px;text-align:left;">Admin</th>
+                <th style="padding:12px 16px;text-align:left;">Hành động</th>
+            </tr></thead><tbody>`;
         
         snapshot.forEach(doc => {
             const log = doc.data();
             const time = log.timestamp?.toDate?.()?.toLocaleString() || 'N/A';
             
-            html += `
-                <tr style="border-bottom:1px solid #f0f0f0;">
-                    <td style="padding:10px 16px;font-size:13px;">${time}</td>
-                    <td style="padding:10px 16px;">${log.adminName || log.adminEmail || 'N/A'}</td>
-                    <td style="padding:10px 16px;">${log.action || 'N/A'}</td>
-                </tr>
-            `;
+            html += `<tr style="border-bottom:1px solid #f0f0f0;">
+                <td style="padding:10px 16px;font-size:13px;">${time}</td>
+                <td style="padding:10px 16px;">${log.adminName || log.adminEmail || 'N/A'}</td>
+                <td style="padding:10px 16px;">${log.action || 'N/A'}</td>
+            </tr>`;
         });
         
         html += '</tbody></table></div>';
@@ -340,7 +350,6 @@ async function saveMatch() {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    // Validate
     if (!data.homeTeam || !data.awayTeam || !data.date || !data.time) {
         alert('⚠️ Vui lòng nhập đầy đủ thông tin!');
         return;
@@ -348,12 +357,12 @@ async function saveMatch() {
     
     try {
         if (matchId) {
-            await db.collection('matches').doc(matchId).update(data);
+            await firebase.firestore().collection('matches').doc(matchId).update(data);
             alert('✅ Cập nhật trận đấu thành công!');
         } else {
             data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            data.createdBy = auth.currentUser.uid;
-            await db.collection('matches').add(data);
+            data.createdBy = firebase.auth().currentUser.uid;
+            await firebase.firestore().collection('matches').add(data);
             alert('✅ Thêm trận đấu thành công!');
         }
         cancelMatchForm();
@@ -367,7 +376,7 @@ async function saveMatch() {
 
 async function editMatch(matchId) {
     try {
-        const doc = await db.collection('matches').doc(matchId).get();
+        const doc = await firebase.firestore().collection('matches').doc(matchId).get();
         if (doc.exists) {
             const data = doc.data();
             showAddMatchForm();
@@ -388,12 +397,10 @@ async function editMatch(matchId) {
 }
 
 async function deleteMatch(matchId) {
-    if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?\nHành động này không thể hoàn tác!')) {
-        return;
-    }
+    if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?')) return;
     
     try {
-        await db.collection('matches').doc(matchId).delete();
+        await firebase.firestore().collection('matches').doc(matchId).delete();
         alert('✅ Xóa trận đấu thành công!');
         await loadMatches();
         await loadDashboard();
@@ -406,22 +413,24 @@ async function deleteMatch(matchId) {
 // ============================================
 // TAB SWITCHING
 // ============================================
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        
-        this.classList.add('active');
-        const tabId = this.dataset.tab;
-        document.getElementById(tabId).classList.add('active');
-        
-        // Load data khi chuyển tab
-        switch(tabId) {
-            case 'matches': loadMatches(); break;
-            case 'users': loadUsers(); break;
-            case 'predictions': loadPredictions(); break;
-            case 'logs': loadLogs(); break;
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            this.classList.add('active');
+            const tabId = this.dataset.tab;
+            const content = document.getElementById(tabId);
+            if (content) content.classList.add('active');
+            
+            switch(tabId) {
+                case 'matches': loadMatches(); break;
+                case 'users': loadUsers(); break;
+                case 'predictions': loadPredictions(); break;
+                case 'logs': loadLogs(); break;
+            }
+        });
     });
 });
 
@@ -430,16 +439,19 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // ============================================
 function logout() {
     if (confirm('Bạn có muốn đăng xuất?')) {
-        auth.signOut().then(() => {
+        firebase.auth().signOut().then(() => {
             window.location.href = 'index.html';
         });
     }
 }
 
 // ============================================
-// INIT
+// INIT - GỌI KHI TRANG LOAD
 // ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔄 DOM loaded, checking admin...');
+console.log('🔄 DOM loaded, checking admin...');
+// Đợi DOM load xong rồi mới kiểm tra
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkAdmin);
+} else {
     checkAdmin();
-});
+}
