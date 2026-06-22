@@ -24,7 +24,7 @@ class AuthManager {
                         totalPredictions: 0,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         lastLogin: firebase.firestore.FieldValue.serverTimestamp() // Thêm
-                    }, {merge: });
+                    }, {merge: true});
                     console.log('✅ Đã tạo user mới:', user.uid);
                 }
                 // Cập nhật UI
