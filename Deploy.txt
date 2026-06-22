@@ -1,0 +1,12 @@
+Ví dụ nếu đây là một trang Web Tĩnh (HTML/CSS/JS hoặc React/Vite):
+Bạn vào trang Vercel.com, chọn đăng nhập bằng chính tài khoản GitHub của bạn.
+
+Hệ thống sẽ tự động quét các kho lưu trữ công khai trên GitHub của bạn. Bạn chỉ cần tìm đúng tên dự án vừa đẩy lên -> nhấn Import.
+
+Nhấn Deploy là xong!
+
+Từ lúc này, mỗi khi bạn sửa code ở máy tính, bạn chỉ cần mở Git Bash chạy bộ 3 lệnh quen thuộc:
+
+git add .
+git commit -m "Cập nhật giao diện"
+git push

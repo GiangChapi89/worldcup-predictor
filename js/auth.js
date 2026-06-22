@@ -15,13 +15,16 @@ class AuthManager {
                 if (!doc.exists) {
                     // Nếu chưa, tạo mới với điểm số 0
                     await userRef.set({
-                        name: user.displayName || user.email || 'Người dùng',
+                        name: user.displayName || user.email,
                         email: user.email,
+                        role: 'user', // Thêm
+                        isActive: true,   // Thêm
                         totalPoints: 0,
                         correctPredictions: 0,
                         totalPredictions: 0,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp() // Thêm
+                    }, {merge: });
                     console.log('✅ Đã tạo user mới:', user.uid);
                 }
                 // Cập nhật UI
@@ -79,6 +82,10 @@ class AuthManager {
         document.getElementById('userName').textContent = user.displayName || user.email;
         document.getElementById('welcomeMessage').style.display = 'block';
         document.querySelector('.info-message').textContent = 'Hãy dự đoán tỷ số nào!';
+        // Cập nhật auth.js để hiển thị link admin
+        if (isAdmin(user)) {
+            document.getElementById('adminLink').style.display = 'inline-block';
+        }
         
         // Enable các chức năng dự đoán
         this.enablePrediction(true);

@@ -71,17 +71,30 @@ class PredictionManager {
 }
 
 // Hàm global để gọi từ HTML
-function predictMatch(matchId) {
+async function predictMatch(matchId) {
     if (!window.currentUserId) {
         document.getElementById('loginModal').style.display = 'block';
         return;
     }
-
-    const homeScore = prompt('Nhập tỷ số đội nhà:');
-    const awayScore = prompt('Nhập tỷ số đội khách:');
     
-    if (homeScore !== null && awayScore !== null) {
-        const predManager = new PredictionManager();
-        predManager.savePrediction(matchId, homeScore, awayScore);
+    // Lấy thông tin trận đấu
+    const matchDoc = await db.collection('matches').doc(matchId).get();
+    const match = matchDoc.data();
+    
+    // Hiển thị form dự đoán với chấp trái
+    const homeScore = prompt(`Dự đoán tỷ số cho ${match.homeTeam}:`);
+    if (homeScore === null) return;
+    
+    const awayScore = prompt(`Dự đoán tỷ số cho ${match.awayTeam}:`);
+    if (awayScore === null) return;
+    
+    // Xử lý chấp trái
+    let handicapChoice = 'draw';
+    if (match.handicap > 0) {
+        const choice = prompt(`Chấp trái: ${match.handicap}\nChọn: (home/away/draw)`);
+        if (choice) handicapChoice = choice.toLowerCase();
     }
+    
+    const predManager = new PredictionManager();
+    await predManager.savePrediction(matchId, homeScore, awayScore, handicapChoice);
 }

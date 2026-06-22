@@ -60,4 +60,56 @@ class MatchManager {
             `;
         }).join('');
     }
+
+    // Trong matches.js - calculatePoints
+    async calculatePoints(matchId) {
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        const match = matchDoc.data();
+        
+        const predictionsSnap = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .get();
+        
+        const batch = db.batch();
+        
+        predictionsSnap.forEach(doc => {
+            const pred = doc.data();
+            const isCorrectScore = pred.homeScore === match.homeScore && 
+                                  pred.awayScore === match.awayScore;
+            
+            // Xử lý chấp trái
+            let isCorrectHandicap = true;
+            if (match.handicap > 0 && pred.handicapChoice) {
+                const diff = match.homeScore - match.awayScore;
+                switch(pred.handicapChoice) {
+                    case 'home':
+                        isCorrectHandicap = diff > match.handicap;
+                        break;
+                    case 'away':
+                        isCorrectHandicap = diff < -match.handicap;
+                        break;
+                    case 'draw':
+                        isCorrectHandicap = Math.abs(diff) < match.handicap;
+                        break;
+                }
+            }
+            
+            const isCorrect = isCorrectScore && isCorrectHandicap;
+            
+            if (isCorrect) {
+                const userRef = db.collection('users').doc(pred.userId);
+                batch.update(userRef, {
+                    totalPoints: firebase.firestore.FieldValue.increment(1),
+                    correctPredictions: firebase.firestore.FieldValue.increment(1)
+                });
+                
+                batch.update(doc.ref, {
+                    points: 1,
+                    isCorrect: true
+                });
+            }
+        });
+        
+        await batch.commit();
+    }
 }
