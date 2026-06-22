@@ -7,13 +7,27 @@ class AuthManager {
 
     initAuth() {
         // Theo dõi trạng thái đăng nhập
-        auth.onAuthStateChanged(user => {
+        auth.onAuthStateChanged(async (user) => {
             if (user) {
-                this.currentUser = user;
+                // Kiểm tra xem user đã có trong Firestore chưa
+                const userRef = db.collection('users').doc(user.uid);
+                const doc = await userRef.get();
+                if (!doc.exists) {
+                    // Nếu chưa, tạo mới với điểm số 0
+                    await userRef.set({
+                        name: user.displayName || user.email || 'Người dùng',
+                        email: user.email,
+                        totalPoints: 0,
+                        correctPredictions: 0,
+                        totalPredictions: 0,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log('✅ Đã tạo user mới:', user.uid);
+                }
+                // Cập nhật UI
                 this.showUserInfo(user);
                 this.loadUserData(user);
             } else {
-                this.currentUser = null;
                 this.showLoginSection();
             }
         });
