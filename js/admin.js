@@ -1,10 +1,11 @@
-// js/admin.js - VERSION SỬA LỖI
+// js/admin.js
+console.log('🔍 Admin.js loaded');
 
 // ============================================
-// DANH SÁCH ADMIN EMAIL
+// DANH SÁCH ADMIN
 // ============================================
 const ADMIN_EMAILS = [
-    'songdaytronglong@gmail.com',  // ✅ Email của bạn
+    'songdaytronglong@gmail.com',
     'admin@gmail.com'
 ];
 
@@ -12,125 +13,86 @@ const ADMIN_EMAILS = [
 // KIỂM TRA QUYỀN ADMIN
 // ============================================
 async function checkAdmin() {
-    console.log('🔍 Đang kiểm tra quyền admin...');
+    console.log('🔍 Checking admin permissions...');
     
     try {
-        // Đợi auth load
-        await new Promise(resolve => {
-            const unsubscribe = auth.onAuthStateChanged(user => {
-                unsubscribe();
-                resolve(user);
-            });
-        });
-
         const user = auth.currentUser;
-        console.log('📧 User hiện tại:', user?.email);
+        console.log('📧 Current user:', user?.email);
 
-        // Kiểm tra đã đăng nhập chưa
         if (!user) {
-            console.warn('⚠️ Chưa đăng nhập');
-            // KHÔNG CHUYỂN HƯỚNG NGAY, hiển thị thông báo
             document.body.innerHTML = `
                 <div style="text-align:center;padding:50px;">
                     <h2>🔐 Vui lòng đăng nhập</h2>
                     <p style="margin:20px 0;">Bạn cần đăng nhập để truy cập trang admin</p>
-                    <a href="index.html" class="btn-primary" style="display:inline-block;padding:12px 30px;border-radius:8px;text-decoration:none;color:white;background:linear-gradient(135deg,#667eea,#764ba2);">← Về trang chủ</a>
+                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;">← Về trang chủ</a>
                 </div>
             `;
             return false;
         }
 
-        // Kiểm tra email có trong danh sách admin không
         if (!ADMIN_EMAILS.includes(user.email)) {
-            console.warn('⚠️ Không có quyền admin:', user.email);
             document.body.innerHTML = `
                 <div style="text-align:center;padding:50px;">
                     <h2>⛔ Không có quyền truy cập</h2>
-                    <p style="margin:20px 0;">Tài khoản ${user.email} không có quyền admin</p>
-                    <a href="index.html" class="btn-primary" style="display:inline-block;padding:12px 30px;border-radius:8px;text-decoration:none;color:white;background:linear-gradient(135deg,#667eea,#764ba2);">← Về trang chủ</a>
+                    <p style="margin:20px 0;">Tài khoản <strong>${user.email}</strong> không có quyền admin</p>
+                    <a href="index.html" style="display:inline-block;padding:12px 30px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:8px;text-decoration:none;">← Về trang chủ</a>
                 </div>
             `;
             return false;
         }
 
-        // ✅ LÀ ADMIN - Hiển thị trang
-        console.log('✅ Admin logged in:', user.email);
+        // ✅ Admin
+        console.log('✅ Admin verified:', user.email);
+        document.getElementById('adminName').textContent = '👤 ' + (user.displayName || user.email);
         
-        // Cập nhật tên admin
-        const nameEl = document.getElementById('adminName');
-        if (nameEl) {
-            nameEl.textContent = user.displayName || user.email;
-        }
-        
-        // Load dữ liệu
-        await Promise.all([
-            loadDashboard(),
-            loadMatches(),
-            loadUsers(),
-            loadLogs()
-        ]);
-        
-        // Hiển thị các tab
-        document.querySelector('.admin-container').style.display = 'block';
+        // Load data
+        await loadDashboard();
+        await loadMatches();
+        await loadUsers();
+        await loadPredictions();
+        await loadLogs();
         
         return true;
         
     } catch (error) {
-        console.error('❌ Lỗi kiểm tra admin:', error);
-        // KHÔNG CHUYỂN HƯỚNG, hiển thị lỗi
-        document.body.innerHTML = `
-            <div style="text-align:center;padding:50px;">
-                <h2>❌ Lỗi</h2>
-                <p style="margin:20px 0;color:red;">${error.message}</p>
-                <button onclick="location.reload()" class="btn-primary" style="padding:12px 30px;border-radius:8px;border:none;cursor:pointer;color:white;background:linear-gradient(135deg,#667eea,#764ba2);">🔄 Thử lại</button>
-                <br><br>
-                <a href="index.html" style="color:#667eea;">← Về trang chủ</a>
-            </div>
-        `;
+        console.error('❌ Error:', error);
         return false;
     }
 }
 
 // ============================================
-// KHỞI TẠO KHI TRANG LOAD
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔄 Admin page loaded');
-    
-    // Ẩn container chính ban đầu
-    const container = document.querySelector('.admin-container');
-    if (container) {
-        container.style.display = 'none';
-    }
-    
-    // Kiểm tra quyền admin
-    checkAdmin();
-});
-
-// ============================================
-// HÀM LOAD DỮ LIỆU
+// LOAD DASHBOARD
 // ============================================
 async function loadDashboard() {
     try {
-        // Users
-        const usersSnap = await db.collection('users').get();
+        const [usersSnap, matchesSnap, predSnap] = await Promise.all([
+            db.collection('users').get(),
+            db.collection('matches').get(),
+            db.collection('predictions').get()
+        ]);
+        
         document.getElementById('totalUsers').textContent = usersSnap.size;
-        
-        // Matches
-        const matchesSnap = await db.collection('matches').get();
         document.getElementById('totalMatches').textContent = matchesSnap.size;
-        
-        // Predictions
-        const predSnap = await db.collection('predictions').get();
         document.getElementById('totalPredictions').textContent = predSnap.size;
+        
+        // Tính tổng điểm
+        let totalPoints = 0;
+        usersSnap.forEach(doc => {
+            totalPoints += doc.data().totalPoints || 0;
+        });
+        document.getElementById('totalPoints').textContent = totalPoints;
+        
     } catch (error) {
         console.error('Lỗi load dashboard:', error);
     }
 }
 
+// ============================================
+// LOAD MATCHES
+// ============================================
 async function loadMatches() {
     const container = document.getElementById('matchListAdmin');
-    if (!container) return;
+    container.innerHTML = '<div class="loading">Đang tải...</div>';
     
     try {
         const snapshot = await db.collection('matches')
@@ -138,84 +100,215 @@ async function loadMatches() {
             .get();
         
         if (snapshot.empty) {
-            container.innerHTML = '<p>Chưa có trận đấu nào</p>';
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có trận đấu nào</p>';
             return;
         }
         
         let html = '<div class="match-grid">';
         snapshot.forEach(doc => {
             const match = doc.data();
+            const id = doc.id;
+            const isFinished = match.status === 'finished';
+            
             html += `
                 <div class="match-card">
                     <div class="match-info">
-                        <span class="team">${match.homeTeam}</span>
+                        <span class="team">${match.homeTeam || '?'}</span>
                         <span class="vs">vs</span>
-                        <span class="team">${match.awayTeam}</span>
+                        <span class="team">${match.awayTeam || '?'}</span>
                     </div>
                     <div class="match-details">
-                        <span>📅 ${match.date}</span>
-                        <span>⏰ ${match.time}</span>
-                        <span>⚡ Chấp: ${match.handicap || 0}</span>
+                        <span>📅 ${match.date || 'N/A'}</span>
+                        <span>⏰ ${match.time || 'N/A'}</span>
+                        <span>⚡ ${match.handicap || 0}</span>
                     </div>
                     <div class="match-score">
-                        ${match.status === 'finished' ? 
-                            `${match.homeScore} - ${match.awayScore}` : 
-                            '⏳ Chưa diễn ra'}
+                        ${isFinished ? `${match.homeScore} - ${match.awayScore}` : '⏳ Chưa diễn ra'}
                     </div>
                     <div class="match-actions">
-                        <button onclick="editMatch('${doc.id}')" class="btn-secondary">✏️ Sửa</button>
-                        <button onclick="deleteMatch('${doc.id}')" class="btn-danger">🗑️ Xóa</button>
+                        <button onclick="editMatch('${id}')" class="btn-secondary btn-sm">✏️ Sửa</button>
+                        <button onclick="deleteMatch('${id}')" class="btn-danger btn-sm">🗑️ Xóa</button>
                     </div>
                 </div>
             `;
         });
         html += '</div>';
         container.innerHTML = html;
+        
     } catch (error) {
         console.error('Lỗi load matches:', error);
-        container.innerHTML = `<p style="color:red;">Lỗi: ${error.message}</p>`;
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
     }
 }
 
+// ============================================
+// LOAD USERS
+// ============================================
 async function loadUsers() {
     const container = document.getElementById('userList');
-    if (!container) return;
+    container.innerHTML = '<div class="loading">Đang tải...</div>';
     
     try {
-        const snapshot = await db.collection('users').get();
+        const snapshot = await db.collection('users')
+            .orderBy('totalPoints', 'desc')
+            .get();
+        
         if (snapshot.empty) {
-            container.innerHTML = '<p>Chưa có người dùng nào</p>';
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có người dùng nào</p>';
             return;
         }
         
         let html = '';
         snapshot.forEach(doc => {
             const user = doc.data();
+            const isAdmin = ADMIN_EMAILS.includes(user.email);
+            
             html += `
                 <div class="user-card">
-                    <span>${user.name || user.email}</span>
-                    <span>${user.email}</span>
-                    <span>⭐ ${user.totalPoints || 0}</span>
+                    <div class="user-info">
+                        <span class="user-name">${user.name || 'N/A'}</span>
+                        <span class="user-email">${user.email || 'N/A'}</span>
+                    </div>
+                    <div class="user-stats">
+                        <span class="badge ${isAdmin ? 'badge-admin' : 'badge-user'}">${isAdmin ? 'Admin' : 'User'}</span>
+                        <span class="badge ${user.isActive !== false ? 'badge-active' : 'badge-locked'}">
+                            ${user.isActive !== false ? '✅ Active' : '🔒 Locked'}
+                        </span>
+                        <span>⭐ ${user.totalPoints || 0}</span>
+                        <span>🎯 ${user.correctPredictions || 0}/${user.totalPredictions || 0}</span>
+                    </div>
                 </div>
             `;
         });
         container.innerHTML = html;
+        
     } catch (error) {
         console.error('Lỗi load users:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
     }
 }
 
-async function loadLogs() {
-    const container = document.getElementById('logList');
-    if (!container) return;
-    container.innerHTML = '<p>Đang tải...</p>';
+// ============================================
+// LOAD PREDICTIONS
+// ============================================
+async function loadPredictions() {
+    const container = document.getElementById('predictionList');
+    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    
+    try {
+        const snapshot = await db.collection('predictions')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có dự đoán nào</p>';
+            return;
+        }
+        
+        let html = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+                    <thead>
+                        <tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+                            <th style="padding:12px 16px;text-align:left;">User</th>
+                            <th style="padding:12px 16px;text-align:left;">Trận</th>
+                            <th style="padding:12px 16px;text-align:center;">Dự đoán</th>
+                            <th style="padding:12px 16px;text-align:center;">Điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        for (const doc of snapshot.docs) {
+            const pred = doc.data();
+            let matchName = 'N/A';
+            try {
+                const matchDoc = await db.collection('matches').doc(pred.matchId).get();
+                if (matchDoc.exists) {
+                    const m = matchDoc.data();
+                    matchName = `${m.homeTeam} vs ${m.awayTeam}`;
+                }
+            } catch (e) {}
+            
+            html += `
+                <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:10px 16px;">${pred.userName || 'N/A'}</td>
+                    <td style="padding:10px 16px;">${matchName}</td>
+                    <td style="padding:10px 16px;text-align:center;">${pred.homeScore} - ${pred.awayScore}</td>
+                    <td style="padding:10px 16px;text-align:center;">${pred.points || 0}</td>
+                </tr>
+            `;
+        }
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Lỗi load predictions:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
 }
 
 // ============================================
-// HÀM QUẢN LÝ TRẬN ĐẤU
+// LOAD LOGS
+// ============================================
+async function loadLogs() {
+    const container = document.getElementById('logList');
+    container.innerHTML = '<div class="loading">Đang tải...</div>';
+    
+    try {
+        const snapshot = await db.collection('audit_logs')
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có lịch sử</p>';
+            return;
+        }
+        
+        let html = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;">
+                    <thead>
+                        <tr style="background:#333;color:white;">
+                            <th style="padding:12px 16px;text-align:left;">Thời gian</th>
+                            <th style="padding:12px 16px;text-align:left;">Admin</th>
+                            <th style="padding:12px 16px;text-align:left;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        snapshot.forEach(doc => {
+            const log = doc.data();
+            const time = log.timestamp?.toDate?.()?.toLocaleString() || 'N/A';
+            
+            html += `
+                <tr style="border-bottom:1px solid #f0f0f0;">
+                    <td style="padding:10px 16px;font-size:13px;">${time}</td>
+                    <td style="padding:10px 16px;">${log.adminName || log.adminEmail || 'N/A'}</td>
+                    <td style="padding:10px 16px;">${log.action || 'N/A'}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Lỗi load logs:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
+}
+
+// ============================================
+// CRUD MATCHES
 // ============================================
 function showAddMatchForm() {
-    document.getElementById('matchForm').style.display = 'block';
+    const form = document.getElementById('matchForm');
+    form.style.display = 'block';
     document.getElementById('matchId').value = '';
     document.getElementById('homeTeam').value = '';
     document.getElementById('awayTeam').value = '';
@@ -225,6 +318,7 @@ function showAddMatchForm() {
     document.getElementById('group').value = '';
     document.getElementById('homeScore').value = '';
     document.getElementById('awayScore').value = '';
+    form.scrollIntoView({ behavior: 'smooth' });
 }
 
 function cancelMatchForm() {
@@ -234,17 +328,23 @@ function cancelMatchForm() {
 async function saveMatch() {
     const matchId = document.getElementById('matchId').value;
     const data = {
-        homeTeam: document.getElementById('homeTeam').value,
-        awayTeam: document.getElementById('awayTeam').value,
+        homeTeam: document.getElementById('homeTeam').value.trim(),
+        awayTeam: document.getElementById('awayTeam').value.trim(),
         date: document.getElementById('matchDate').value,
         time: document.getElementById('matchTime').value,
-        handicap: parseFloat(document.getElementById('handicap').value),
-        group: document.getElementById('group').value || 'Group A',
+        handicap: parseFloat(document.getElementById('handicap').value) || 0,
+        group: document.getElementById('group').value.trim() || 'Group A',
         homeScore: document.getElementById('homeScore').value ? parseInt(document.getElementById('homeScore').value) : null,
         awayScore: document.getElementById('awayScore').value ? parseInt(document.getElementById('awayScore').value) : null,
         status: document.getElementById('homeScore').value && document.getElementById('awayScore').value ? 'finished' : 'upcoming',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+    
+    // Validate
+    if (!data.homeTeam || !data.awayTeam || !data.date || !data.time) {
+        alert('⚠️ Vui lòng nhập đầy đủ thông tin!');
+        return;
+    }
     
     try {
         if (matchId) {
@@ -257,7 +357,8 @@ async function saveMatch() {
             alert('✅ Thêm trận đấu thành công!');
         }
         cancelMatchForm();
-        loadMatches();
+        await loadMatches();
+        await loadDashboard();
     } catch (error) {
         console.error('Lỗi lưu trận đấu:', error);
         alert('❌ Lỗi: ' + error.message);
@@ -282,19 +383,23 @@ async function editMatch(matchId) {
         }
     } catch (error) {
         console.error('Lỗi edit match:', error);
+        alert('❌ Lỗi: ' + error.message);
     }
 }
 
 async function deleteMatch(matchId) {
-    if (confirm('Bạn có chắc muốn xóa trận đấu này?')) {
-        try {
-            await db.collection('matches').doc(matchId).delete();
-            alert('✅ Xóa trận đấu thành công!');
-            loadMatches();
-        } catch (error) {
-            console.error('Lỗi xóa trận:', error);
-            alert('❌ Lỗi: ' + error.message);
-        }
+    if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?\nHành động này không thể hoàn tác!')) {
+        return;
+    }
+    
+    try {
+        await db.collection('matches').doc(matchId).delete();
+        alert('✅ Xóa trận đấu thành công!');
+        await loadMatches();
+        await loadDashboard();
+    } catch (error) {
+        console.error('Lỗi xóa trận:', error);
+        alert('❌ Lỗi: ' + error.message);
     }
 }
 
@@ -310,9 +415,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         const tabId = this.dataset.tab;
         document.getElementById(tabId).classList.add('active');
         
-        if (tabId === 'matches') loadMatches();
-        if (tabId === 'users') loadUsers();
-        if (tabId === 'logs') loadLogs();
+        // Load data khi chuyển tab
+        switch(tabId) {
+            case 'matches': loadMatches(); break;
+            case 'users': loadUsers(); break;
+            case 'predictions': loadPredictions(); break;
+            case 'logs': loadLogs(); break;
+        }
     });
 });
 
@@ -320,9 +429,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // LOGOUT
 // ============================================
 function logout() {
-    auth.signOut().then(() => {
-        window.location.href = 'index.html';
-    });
+    if (confirm('Bạn có muốn đăng xuất?')) {
+        auth.signOut().then(() => {
+            window.location.href = 'index.html';
+        });
+    }
 }
 
-console.log('✅ admin.js loaded successfully!');
+// ============================================
+// INIT
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 DOM loaded, checking admin...');
+    checkAdmin();
+});
