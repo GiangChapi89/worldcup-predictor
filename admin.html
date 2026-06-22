@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - World Cup 2026</title>
+    <title>⚙️ Admin Panel - World Cup 2026</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
     
@@ -14,11 +14,11 @@
 <body>
     <nav class="navbar admin-nav">
         <div class="container">
-            <h1>⚽ Admin Panel - World Cup 2026</h1>
+            <h1>⚙️ Admin Panel - World Cup 2026</h1>
             <div>
-                <span id="adminName"></span>
-                <button onclick="logout()" class="btn-logout">Đăng Xuất</button>
-                <a href="index.html" class="btn-back">← Về trang chính</a>
+                <span id="adminName" style="color:white; margin-right:15px;"></span>
+                <button onclick="logout()" class="btn-logout">🚪 Đăng Xuất</button>
+                <a href="index.html" class="btn-back" style="margin-left:10px;">← Về trang chính</a>
             </div>
         </div>
     </nav>
@@ -36,34 +36,18 @@
         <!-- Dashboard -->
         <div id="dashboard" class="tab-content active">
             <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Tổng người dùng</h3>
-                    <p id="totalUsers">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Tổng trận đấu</h3>
-                    <p id="totalMatches">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Tổng dự đoán</h3>
-                    <p id="totalPredictions">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Người dùng đang online</h3>
-                    <p id="onlineUsers">0</p>
-                </div>
+                <div class="stat-card"><h3>Tổng người dùng</h3><p id="totalUsers">0</p></div>
+                <div class="stat-card"><h3>Tổng trận đấu</h3><p id="totalMatches">0</p></div>
+                <div class="stat-card"><h3>Tổng dự đoán</h3><p id="totalPredictions">0</p></div>
             </div>
-            <div id="recentActivity"></div>
         </div>
 
         <!-- Quản lý trận đấu -->
         <div id="matches" class="tab-content">
             <div class="admin-actions">
                 <button onclick="showAddMatchForm()" class="btn-primary">➕ Thêm Trận Đấu</button>
-                <button onclick="showBulkImport()" class="btn-secondary">📥 Import Nhiều Trận</button>
             </div>
             
-            <!-- Form thêm trận -->
             <div id="matchForm" style="display:none;" class="form-container">
                 <h3>Thêm/Cập nhật trận đấu</h3>
                 <input type="hidden" id="matchId">
@@ -120,44 +104,25 @@
                 <div class="form-actions">
                     <button onclick="saveMatch()" class="btn-primary">💾 Lưu</button>
                     <button onclick="cancelMatchForm()" class="btn-secondary">❌ Hủy</button>
-                    <button onclick="deleteMatch()" class="btn-danger" id="deleteMatchBtn" style="display:none;">🗑️ Xóa</button>
                 </div>
             </div>
 
-            <!-- Danh sách trận đấu -->
             <div id="matchListAdmin"></div>
         </div>
 
         <!-- Quản lý người dùng -->
         <div id="users" class="tab-content">
-            <div class="search-bar">
-                <input type="text" id="userSearch" placeholder="🔍 Tìm kiếm người dùng..." onkeyup="searchUsers()">
-                <button onclick="exportUsers()" class="btn-secondary">📥 Export CSV</button>
-            </div>
             <div id="userList"></div>
         </div>
 
         <!-- Dự đoán -->
         <div id="predictions" class="tab-content">
-            <div id="predictionStats"></div>
             <div id="predictionList"></div>
         </div>
 
         <!-- Lịch sử -->
         <div id="logs" class="tab-content">
             <div id="logList"></div>
-        </div>
-    </div>
-
-    <!-- Modal xác nhận -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content">
-            <h3>Xác nhận</h3>
-            <p id="confirmMessage"></p>
-            <div class="form-actions">
-                <button onclick="confirmAction()" class="btn-danger">Xác nhận</button>
-                <button onclick="closeConfirmModal()" class="btn-secondary">Hủy</button>
-            </div>
         </div>
     </div>
 

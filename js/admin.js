@@ -3,23 +3,35 @@ let currentAction = null;
 let currentTarget = null;
 
 // Kiểm tra quyền admin
+// js/admin.js
 async function checkAdmin() {
-    const user = auth.currentUser;
-    if (!user) {
-        window.location.href = 'index.html';
-        return;
-    }
+    // Hiển thị loading
+    document.body.innerHTML = '<div style="text-align:center;padding:50px;">⏳ Đang kiểm tra quyền...</div>';
     
-    // Kiểm tra email admin
-    const adminEmails = ['admin@gmail.com', 'songdaytronglong@gmail.com'];
-    if (!adminEmails.includes(user.email)) {
-        alert('Bạn không có quyền truy cập trang admin!');
+    try {
+        const user = auth.currentUser;
+        
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Kiểm tra email
+        if (!ADMIN_EMAILS.includes(user.email)) {
+            alert('❌ Không có quyền admin!');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // ✅ Admin - Hiển thị trang
+        console.log('✅ Admin:', user.email);
+        // Load lại nội dung trang (nếu đã bị xóa)
+        location.reload();
+        
+    } catch (error) {
+        console.error('❌ Lỗi:', error);
         window.location.href = 'index.html';
-        return;
     }
-    
-    document.getElementById('adminName').textContent = user.displayName || user.email;
-    loadDashboard();
 }
 
 // Load Dashboard
@@ -476,6 +488,8 @@ function logout() {
         window.location.href = 'index.html';
     });
 }
+
+
 
 // Initialize
 document.addEventListener('DOMContentLoaded', checkAdmin);
