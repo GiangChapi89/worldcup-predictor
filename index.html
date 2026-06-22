@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dự Đoán World Cup 2026</title>
+    <title>⚽ Dự Đoán World Cup 2026</title>
+    
+    <!-- CSS -->
     <link rel="stylesheet" href="css/style.css">
     
-    <!-- Thêm Firebase SDK -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <!-- Thanh điều hướng với thông tin user -->
+    <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="nav-left">
@@ -20,70 +22,75 @@
             </div>
             <div class="nav-right">
                 <ul>
-                    <li><a href="#matches">Trận Đấu</a></li>
-                    <li><a href="#predictions">Dự Đoán</a></li>
-                    <li><a href="#statistics">Bảng Xếp Hạng</a></li>
-                    <!-- Thêm link admin (chỉ hiển thị với admin) -->
+                    <li><a href="#matches">🏆 Trận Đấu</a></li>
+                    <li><a href="#statistics">📊 Bảng Xếp Hạng</a></li>
                     <li><a href="admin.html" id="adminLink" style="display:none;">⚙️ Admin</a></li>
                 </ul>
-                <!-- Phần hiển thị user -->
                 <div id="userSection">
                     <div id="userInfo" style="display: none;">
                         <span id="userName"></span>
                         <button id="logoutBtn" class="btn-logout">Đăng Xuất</button>
                     </div>
                     <div id="loginSection">
-                        <button id="loginBtn" class="btn-login">Đăng Nhập</button>
+                        <button id="loginBtn" class="btn-login">🔑 Đăng Nhập</button>
                     </div>
                 </div>
             </div>
         </div>
     </nav>
 
+    <!-- Main Content -->
     <main class="container">
-        <!-- Phần chào mừng -->
+        <!-- Welcome Message -->
         <div id="welcomeMessage" style="display: none;">
             <div class="welcome-card">
-                <h2>Chào mừng, <span id="displayName"></span>!</h2>
-                <p>Bắt đầu dự đoán các trận đấu World Cup 2026 ngay nào!</p>
+                <h2>👋 Chào mừng, <span id="displayName"></span>!</h2>
+                <p>Hãy dự đoán kết quả các trận đấu World Cup 2026 nào!</p>
             </div>
         </div>
 
-        <!-- Các section khác giữ nguyên -->
+        <!-- Matches Section -->
         <section id="matches">
-            <h2>Lịch Thi Đấu</h2>
-            <div id="matchList" class="match-grid"></div>
-        </section>
-
-        <section id="predictions">
-            <h2>Dự Đoán Tỷ Số</h2>
-            <div id="predictionForm">
-                <p class="info-message">Vui lòng đăng nhập để dự đoán!</p>
+            <h2>📅 Lịch Thi Đấu</h2>
+            <div id="matchList" class="match-grid">
+                <p style="text-align: center; padding: 20px;">Đang tải dữ liệu...</p>
             </div>
         </section>
 
+        <!-- Statistics Section -->
         <section id="statistics">
-            <h2>Bảng Xếp Hạng</h2>
-            <div id="rankingTable"></div>
+            <h2>🏆 Bảng Xếp Hạng</h2>
+            <div id="rankingTable">
+                <p style="text-align: center; padding: 20px;">Đang tải bảng xếp hạng...</p>
+            </div>
             <div id="dailyStats"></div>
         </section>
     </main>
 
-    <!-- Modal đăng nhập -->
+    <!-- Login Modal -->
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>Đăng Nhập</h2>
-            <div id="firebaseui-auth-container"></div>
+            <h2>🔐 Đăng Nhập</h2>
+            
+            <!-- Các phương thức đăng nhập -->
             <div class="auth-options">
                 <button id="googleLogin" class="auth-btn google">
                     <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google">
                     Đăng nhập với Google
                 </button>
+                
                 <button id="emailLogin" class="auth-btn email">
                     📧 Đăng nhập với Email
                 </button>
+                
+                <!-- THÊM: Nút đăng nhập bằng số điện thoại -->
+                <button id="phoneLogin" class="auth-btn phone">
+                    📱 Đăng nhập với Số điện thoại
+                </button>
             </div>
+
+            <!-- Form đăng nhập Email -->
             <div id="emailLoginForm" style="display: none;">
                 <input type="email" id="loginEmail" placeholder="Email" class="auth-input">
                 <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
@@ -92,6 +99,8 @@
                     Chưa có tài khoản? <a href="#" id="switchToRegister">Đăng ký</a>
                 </p>
             </div>
+
+            <!-- Form đăng ký -->
             <div id="registerForm" style="display: none;">
                 <input type="text" id="registerName" placeholder="Tên hiển thị" class="auth-input">
                 <input type="email" id="registerEmail" placeholder="Email" class="auth-input">
@@ -101,14 +110,42 @@
                     Đã có tài khoản? <a href="#" id="switchToLogin">Đăng nhập</a>
                 </p>
             </div>
+
+            <!-- THÊM: Form đăng nhập bằng số điện thoại -->
+            <div id="phoneLoginForm" style="display: none;">
+                <div class="form-group">
+                    <label>Số điện thoại (bao gồm mã quốc gia)</label>
+                    <input type="tel" id="phoneNumber" placeholder="+8490xxxxxxx" class="auth-input">
+                    <small style="color: #666; font-size: 12px;">Ví dụ: +84901234567 (Việt Nam)</small>
+                </div>
+                
+                <!-- reCAPTCHA container - QUAN TRỌNG -->
+                <div id="recaptcha-container"></div>
+                
+                <button id="sendOTP" class="auth-submit">📨 Gửi mã OTP</button>
+                
+                <div id="otpSection" style="display: none; margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Nhập mã OTP</label>
+                        <input type="text" id="otpCode" placeholder="Nhập mã 6 số" class="auth-input" maxlength="6">
+                    </div>
+                    <button id="verifyOTP" class="auth-submit">✅ Xác nhận</button>
+                    <button id="resendOTP" class="btn-secondary" style="width: 100%; margin-top: 10px;">🔄 Gửi lại mã</button>
+                </div>
+                
+                <p class="auth-switch">
+                    <a href="#" id="switchToEmailFromPhone">← Quay lại đăng nhập Email</a>
+                </p>
+            </div>
         </div>
     </div>
 
+    <!-- JavaScript -->
     <script src="js/firebase-config.js"></script>
     <script src="js/auth.js"></script>
-    <script src="js/app.js"></script>
     <script src="js/matches.js"></script>
     <script src="js/predictions.js"></script>
     <script src="js/statistics.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
