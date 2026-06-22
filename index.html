@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dự Đoán World Cup 2026</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1>⚽ Dự Đoán World Cup 2026</h1>
+            <ul>
+                <li><a href="#matches">Trận Đấu</a></li>
+                <li><a href="#predictions">Dự Đoán</a></li>
+                <li><a href="#statistics">Bảng Xếp Hạng</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Danh sách trận đấu -->
+        <section id="matches">
+            <h2>Lịch Thi Đấu</h2>
+            <div id="matchList" class="match-grid"></div>
+        </section>
+
+        <!-- Dự đoán -->
+        <section id="predictions">
+            <h2>Dự Đoán Tỷ Số</h2>
+            <div id="predictionForm"></div>
+        </section>
+
+        <!-- Bảng xếp hạng -->
+        <section id="statistics">
+            <h2>Bảng Xếp Hạng</h2>
+            <div id="rankingTable"></div>
+            <div id="dailyStats"></div>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script src="js/matches.js"></script>
+    <script src="js/predictions.js"></script>
+    <script src="js/statistics.js"></script>
+</body>
+</html>

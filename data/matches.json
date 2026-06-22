@@ -1,0 +1,31 @@
+{
+  "matches": [
+    {
+      "id": 1,
+      "homeTeam": "Brazil",
+      "awayTeam": "Argentina",
+      "date": "2026-06-22",
+      "time": "20:00",
+      "homeScore": null,
+      "awayScore": null,
+      "status": "upcoming"
+    }
+  ],
+  "predictions": [
+    {
+      "id": 1,
+      "matchId": 1,
+      "userId": 1,
+      "homeScore": 2,
+      "awayScore": 1,
+      "points": 0
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "name": "Nguyễn Văn A",
+      "email": "a@gmail.com"
+    }
+  ]
+}
