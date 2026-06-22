@@ -14,7 +14,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <!-- Navigation -->
+    <!-- Navigation - Nổi bật nút Đăng Nhập -->
     <nav class="navbar">
         <div class="container">
             <div class="nav-left">
@@ -27,12 +27,14 @@
                     <li><a href="admin.html" id="adminLink" style="display:none;">⚙️ Admin</a></li>
                 </ul>
                 <div id="userSection">
+                    <!-- Thông tin user khi đã đăng nhập -->
                     <div id="userInfo" style="display: none;">
-                        <span id="userName"></span>
-                        <button id="logoutBtn" class="btn-logout">Đăng Xuất</button>
+                        <span id="userName" class="user-name-display"></span>
+                        <button id="logoutBtn" class="btn-logout">🚪 Đăng Xuất</button>
                     </div>
+                    <!-- Nút Đăng Nhập - Nổi bật -->
                     <div id="loginSection">
-                        <button id="loginBtn" class="btn-login">🔑 Đăng Nhập</button>
+                        <button id="loginBtn" class="btn-login-main">🔑 Đăng Nhập</button>
                     </div>
                 </div>
             </div>
@@ -67,74 +69,59 @@
         </section>
     </main>
 
-    <!-- Login Modal -->
+    <!-- Login Modal - Đơn giản, chỉ có Google và Email -->
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>🔐 Đăng Nhập</h2>
+            <h2 style="text-align: center; margin-bottom: 25px;">🔐 Đăng Nhập</h2>
             
             <!-- Các phương thức đăng nhập -->
             <div class="auth-options">
+                <!-- Nút Google nổi bật -->
                 <button id="googleLogin" class="auth-btn google">
                     <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google">
                     Đăng nhập với Google
                 </button>
                 
+                <!-- Nút Email -->
                 <button id="emailLogin" class="auth-btn email">
                     📧 Đăng nhập với Email
-                </button>
-                
-                <!-- THÊM: Nút đăng nhập bằng số điện thoại -->
-                <button id="phoneLogin" class="auth-btn phone">
-                    📱 Đăng nhập với Số điện thoại
                 </button>
             </div>
 
             <!-- Form đăng nhập Email -->
-            <div id="emailLoginForm" style="display: none;">
-                <input type="email" id="loginEmail" placeholder="Email" class="auth-input">
-                <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
+            <div id="emailLoginForm" style="display: none; margin-top: 20px;">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="your@email.com" class="auth-input">
+                </div>
+                <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" id="loginPassword" placeholder="Mật khẩu" class="auth-input">
+                </div>
                 <button id="submitLogin" class="auth-submit">Đăng Nhập</button>
                 <p class="auth-switch">
-                    Chưa có tài khoản? <a href="#" id="switchToRegister">Đăng ký</a>
+                    Chưa có tài khoản? <a href="#" id="switchToRegister">Đăng ký ngay</a>
                 </p>
             </div>
 
             <!-- Form đăng ký -->
-            <div id="registerForm" style="display: none;">
-                <input type="text" id="registerName" placeholder="Tên hiển thị" class="auth-input">
-                <input type="email" id="registerEmail" placeholder="Email" class="auth-input">
-                <input type="password" id="registerPassword" placeholder="Mật khẩu" class="auth-input">
+            <div id="registerForm" style="display: none; margin-top: 20px;">
+                <div class="form-group">
+                    <label>Tên hiển thị</label>
+                    <input type="text" id="registerName" placeholder="Tên của bạn" class="auth-input">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="your@email.com" class="auth-input">
+                </div>
+                <div class="form-group">
+                    <label>Mật khẩu</label>
+                    <input type="password" id="registerPassword" placeholder="Ít nhất 6 ký tự" class="auth-input">
+                </div>
                 <button id="submitRegister" class="auth-submit">Đăng Ký</button>
                 <p class="auth-switch">
                     Đã có tài khoản? <a href="#" id="switchToLogin">Đăng nhập</a>
-                </p>
-            </div>
-
-            <!-- THÊM: Form đăng nhập bằng số điện thoại -->
-            <div id="phoneLoginForm" style="display: none;">
-                <div class="form-group">
-                    <label>Số điện thoại (bao gồm mã quốc gia)</label>
-                    <input type="tel" id="phoneNumber" placeholder="+8490xxxxxxx" class="auth-input">
-                    <small style="color: #666; font-size: 12px;">Ví dụ: +84901234567 (Việt Nam)</small>
-                </div>
-                
-                <!-- reCAPTCHA container - QUAN TRỌNG -->
-                <div id="recaptcha-container"></div>
-                
-                <button id="sendOTP" class="auth-submit">📨 Gửi mã OTP</button>
-                
-                <div id="otpSection" style="display: none; margin-top: 15px;">
-                    <div class="form-group">
-                        <label>Nhập mã OTP</label>
-                        <input type="text" id="otpCode" placeholder="Nhập mã 6 số" class="auth-input" maxlength="6">
-                    </div>
-                    <button id="verifyOTP" class="auth-submit">✅ Xác nhận</button>
-                    <button id="resendOTP" class="btn-secondary" style="width: 100%; margin-top: 10px;">🔄 Gửi lại mã</button>
-                </div>
-                
-                <p class="auth-switch">
-                    <a href="#" id="switchToEmailFromPhone">← Quay lại đăng nhập Email</a>
                 </p>
             </div>
         </div>
