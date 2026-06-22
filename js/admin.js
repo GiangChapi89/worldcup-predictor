@@ -11,7 +11,7 @@ async function checkAdmin() {
     }
     
     // Kiểm tra email admin
-    const adminEmails = ['admin@gmail.com', 'your-email@gmail.com'];
+    const adminEmails = ['admin@gmail.com', 'songdaytronglong@gmail.com'];
     if (!adminEmails.includes(user.email)) {
         alert('Bạn không có quyền truy cập trang admin!');
         window.location.href = 'index.html';

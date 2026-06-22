@@ -200,7 +200,7 @@ class AuthManager {
         document.getElementById('welcomeMessage').style.display = 'block';
         
         // Hiển thị link admin nếu là admin
-        const adminEmails = ['admin@gmail.com', 'your-email@gmail.com'];
+        const adminEmails = ['admin@gmail.com', 'songdaytronglong@gmail.com'];
         if (adminEmails.includes(user.email)) {
             document.getElementById('adminLink').style.display = 'inline-block';
         }
