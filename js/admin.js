@@ -1,8 +1,7 @@
-// js/admin.js
+// js/admin.js - CẬP NHẬT HOÀN CHỈNH
+
 console.log('🔍 Admin.js loaded');
 
-// Tạo instance global
-let matchManager = null;
 // ============================================
 // DANH SÁCH ADMIN
 // ============================================
@@ -77,22 +76,6 @@ async function checkAdmin() {
         console.error('❌ Lỗi:', error);
         return false;
     }
-    if (window.matchManager) {
-        await window.matchManager.listenMatches();
-    }
-}
-
-// Khởi tạo MatchManager khi load
-async function initMatchManager() {
-    try {
-        matchManager = new MatchManager();
-        // Load dữ liệu matches
-        await matchManager.listenMatches();
-        window.matchManager = matchManager;
-        console.log('✅ MatchManager initialized');
-    } catch (error) {
-        console.error('❌ Lỗi init MatchManager:', error);
-    }
 }
 
 // ============================================
@@ -117,7 +100,6 @@ async function loadDashboard() {
         });
         document.getElementById('totalPoints').textContent = totalPoints;
         
-        // Load recent activity
         await loadRecentActivity();
         
     } catch (error) {
@@ -169,8 +151,6 @@ async function loadRecentActivity() {
 // ============================================
 // LOAD MATCHES
 // ============================================
-// js/admin.js - CẬP NHẬT loadMatches
-
 async function loadMatches() {
     const container = document.getElementById('matchListAdmin');
     if (!container) return;
@@ -183,20 +163,15 @@ async function loadMatches() {
             .orderBy('date')
             .get();
         
-        // Lưu dữ liệu vào global để các hàm khác sử dụng
-        window.adminMatches = [];
-        snapshot.forEach(doc => {
-            window.adminMatches.push({ id: doc.id, ...doc.data() });
-        });
-        
-        if (window.adminMatches.length === 0) {
+        if (snapshot.empty) {
             container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có trận đấu nào</p>';
             return;
         }
         
         let html = '<div class="match-grid">';
-        window.adminMatches.forEach(match => {
-            const id = match.id;
+        snapshot.forEach(doc => {
+            const match = doc.data();
+            const id = doc.id;
             const isFinished = match.status === 'finished';
             const statusClass = isFinished ? 'finished' : 'upcoming';
             
@@ -242,326 +217,38 @@ async function loadMatches() {
 }
 
 // ============================================
-// LOAD USERS
+// SHOW RESULT FORM - SỬA LỖI
 // ============================================
-async function loadUsers() {
-    const container = document.getElementById('userList');
-    if (!container) return;
+async function showResultForm(matchId) {
+    console.log('🔍 showResultForm called with matchId:', matchId);
     
-    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
-    
-    try {
-        const db = firebase.firestore();
-        const snapshot = await db.collection('users')
-            .orderBy('totalPoints', 'desc')
-            .get();
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có người dùng nào</p>';
-            return;
-        }
-        
-        let html = '';
-        snapshot.forEach(doc => {
-            const user = doc.data();
-            const isAdmin = ADMIN_EMAILS.includes(user.email);
-            
-            html += `
-                <div class="user-card">
-                    <div class="user-info">
-                        <span class="user-name">${user.name || 'N/A'}</span>
-                        <span class="user-email">${user.email || 'N/A'}</span>
-                    </div>
-                    <div class="user-stats">
-                        <span class="badge ${isAdmin ? 'badge-admin' : 'badge-user'}">${isAdmin ? 'Admin' : 'User'}</span>
-                        <span class="badge ${user.isActive !== false ? 'badge-active' : 'badge-locked'}">
-                            ${user.isActive !== false ? '✅ Active' : '🔒 Locked'}
-                        </span>
-                        <span>💰 ${user.balance || 0}</span>
-                        <span>⭐ ${user.totalPoints || 0}</span>
-                        <span>🎯 ${user.correctPredictions || 0}/${user.totalPredictions || 0}</span>
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Lỗi load users:', error);
-        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
-    }
-}
-
-// ============================================
-// LOAD PREDICTIONS
-// ============================================
-async function loadPredictions() {
-    const container = document.getElementById('predictionList');
-    if (!container) return;
-    
-    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
-    
-    try {
-        const db = firebase.firestore();
-        const snapshot = await db.collection('predictions')
-            .orderBy('timestamp', 'desc')
-            .limit(50)
-            .get();
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có dự đoán nào</p>';
-            return;
-        }
-        
-        let html = `<div class="table-wrapper"><table>
-            <thead>
-                <tr>
-                    <th>User</th>
-                    <th>Trận</th>
-                    <th>Dự đoán</th>
-                    <th>Kèo chấp</th>
-                    <th>Điểm</th>
-                    <th>Trạng thái</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        
-        for (const doc of snapshot.docs) {
-            const pred = doc.data();
-            let matchName = 'N/A';
-            try {
-                const matchDoc = await db.collection('matches').doc(pred.matchId).get();
-                if (matchDoc.exists) {
-                    const m = matchDoc.data();
-                    matchName = `${m.homeTeam} vs ${m.awayTeam}`;
-                }
-            } catch (e) {}
-            
-            const statusBadge = pred.isProcessed ? 
-                (pred.isCorrect ? '✅ Đúng' : '❌ Sai') : 
-                '⏳ Chờ xử lý';
-            
-            html += `
-                <tr>
-                    <td>${pred.userName || 'N/A'}</td>
-                    <td>${matchName}</td>
-                    <td style="text-align:center;font-weight:600;">${pred.homeScore} - ${pred.awayScore}</td>
-                    <td>${pred.userHandicap || 0} (${pred.handicapChoice || 'draw'})</td>
-                    <td style="text-align:center;font-weight:bold;color:${pred.points > 0 ? '#28a745' : '#dc3545'};">${pred.points || 0}</td>
-                    <td>${statusBadge}</td>
-                </tr>
-            `;
-        }
-        
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Lỗi load predictions:', error);
-        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
-    }
-}
-
-// ============================================
-// LOAD LOGS - SỬA LỖI
-// ============================================
-async function loadLogs() {
-    const container = document.getElementById('logList');
-    if (!container) return;
-    
-    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
-    
-    try {
-        const db = firebase.firestore();
-        
-        // Kiểm tra collection có tồn tại không
-        const testSnap = await db.collection('audit_logs').limit(1).get();
-        
-        const snapshot = await db.collection('audit_logs')
-            .orderBy('timestamp', 'desc')
-            .limit(20)
-            .get();
-        
-        if (snapshot.empty) {
-            container.innerHTML = `
-                <div style="text-align:center;padding:30px;color:#888;">
-                    <p>📭 Chưa có lịch sử hoạt động</p>
-                    <p style="font-size:13px;margin-top:5px;">Lịch sử sẽ được ghi lại khi admin thực hiện các thao tác</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = `<div class="table-wrapper"><table>
-            <thead>
-                <tr>
-                    <th>Thời gian</th>
-                    <th>Admin</th>
-                    <th>Hành động</th>
-                    <th>Chi tiết</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        
-        snapshot.forEach(doc => {
-            const log = doc.data();
-            let time = 'N/A';
-            if (log.timestamp && log.timestamp.toDate) {
-                time = log.timestamp.toDate().toLocaleString();
-            }
-            
-            html += `
-                <tr>
-                    <td style="font-size:13px;">${time}</td>
-                    <td>${log.adminName || log.adminEmail || 'N/A'}</td>
-                    <td>${log.action || 'N/A'}</td>
-                    <td style="font-size:13px;color:#666;">${log.detail || ''}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.warn('⚠️ Lỗi load logs (có thể chưa có collection):', error.message);
-        container.innerHTML = `
-            <div style="text-align:center;padding:30px;color:#888;">
-                <p>📭 Chưa có lịch sử hoạt động</p>
-                <p style="font-size:13px;margin-top:5px;color:#aaa;">Lịch sử sẽ được ghi lại khi bạn thực hiện các thao tác quản trị</p>
-            </div>
-        `;
-    }
-}
-
-// ============================================
-// CRUD MATCHES
-// ============================================
-function showAddMatchForm() {
-    const form = document.getElementById('matchForm');
-    if (!form) return;
-    form.style.display = 'block';
-    document.getElementById('matchId').value = '';
-    document.getElementById('homeTeam').value = '';
-    document.getElementById('awayTeam').value = '';
-    document.getElementById('matchDate').value = '';
-    document.getElementById('matchTime').value = '';
-    document.getElementById('handicap').value = '0';
-    document.getElementById('group').value = '';
-    document.getElementById('homeScore').value = '';
-    document.getElementById('awayScore').value = '';
-    form.scrollIntoView({ behavior: 'smooth' });
-}
-
-function cancelMatchForm() {
-    const form = document.getElementById('matchForm');
-    if (form) {
-        form.style.display = 'none';
-    }
-}
-
-async function saveMatch() {
-    const matchId = document.getElementById('matchId').value;
-    const data = {
-        homeTeam: document.getElementById('homeTeam').value.trim(),
-        awayTeam: document.getElementById('awayTeam').value.trim(),
-        date: document.getElementById('matchDate').value,
-        time: document.getElementById('matchTime').value,
-        handicap: parseFloat(document.getElementById('handicap').value) || 0,
-        group: document.getElementById('group').value.trim() || 'Group A',
-        homeScore: document.getElementById('homeScore').value ? parseInt(document.getElementById('homeScore').value) : null,
-        awayScore: document.getElementById('awayScore').value ? parseInt(document.getElementById('awayScore').value) : null,
-        status: document.getElementById('homeScore').value && document.getElementById('awayScore').value ? 'finished' : 'upcoming',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    
-    if (!data.homeTeam || !data.awayTeam || !data.date || !data.time) {
-        alert('⚠️ Vui lòng nhập đầy đủ thông tin!');
+    if (!matchId) {
+        alert('❌ Không tìm thấy ID trận đấu!');
         return;
     }
-    
-    try {
-        const db = firebase.firestore();
-        if (matchId) {
-            await db.collection('matches').doc(matchId).update(data);
-            await logAdminAction('update_match', matchId, { homeTeam: data.homeTeam, awayTeam: data.awayTeam });
-            alert('✅ Cập nhật trận đấu thành công!');
-        } else {
-            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            data.createdBy = firebase.auth().currentUser.uid;
-            const docRef = await db.collection('matches').add(data);
-            await logAdminAction('create_match', docRef.id, { homeTeam: data.homeTeam, awayTeam: data.awayTeam });
-            alert('✅ Thêm trận đấu thành công!');
-        }
-        cancelMatchForm();
-        await loadMatches();
-        await loadDashboard();
-    } catch (error) {
-        console.error('Lỗi lưu trận đấu:', error);
-        alert('❌ Lỗi: ' + error.message);
-    }
-}
 
-async function editMatch(matchId) {
-    try {
-        const db = firebase.firestore();
-        const doc = await db.collection('matches').doc(matchId).get();
-        if (doc.exists) {
-            const data = doc.data();
-            showAddMatchForm();
-            document.getElementById('matchId').value = matchId;
-            document.getElementById('homeTeam').value = data.homeTeam || '';
-            document.getElementById('awayTeam').value = data.awayTeam || '';
-            document.getElementById('matchDate').value = data.date || '';
-            document.getElementById('matchTime').value = data.time || '';
-            document.getElementById('handicap').value = data.handicap || 0;
-            document.getElementById('group').value = data.group || '';
-            document.getElementById('homeScore').value = data.homeScore || '';
-            document.getElementById('awayScore').value = data.awayScore || '';
-        }
-    } catch (error) {
-        console.error('Lỗi edit match:', error);
-        alert('❌ Lỗi: ' + error.message);
-    }
-}
-
-async function deleteMatch(matchId) {
-    if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?')) return;
-    
-    try {
-        const db = firebase.firestore();
-        const matchDoc = await db.collection('matches').doc(matchId).get();
-        const match = matchDoc.data();
-        await db.collection('matches').doc(matchId).delete();
-        await logAdminAction('delete_match', matchId, { homeTeam: match?.homeTeam, awayTeam: match?.awayTeam });
-        alert('✅ Xóa trận đấu thành công!');
-        await loadMatches();
-        await loadDashboard();
-    } catch (error) {
-        console.error('Lỗi xóa trận:', error);
-        alert('❌ Lỗi: ' + error.message);
-    }
-}
-
-// ============================================
-// QUẢN LÝ KẾT QUẢ
-// ============================================
-// js/admin.js - SỬA HÀM showResultForm
-
-async function showResultForm(matchId) {
     try {
         const db = firebase.firestore();
         
-        // Lấy trực tiếp từ Firestore thay vì từ memory
+        // Lấy trực tiếp từ Firestore
         const matchDoc = await db.collection('matches').doc(matchId).get();
+        
+        console.log('📄 Match document exists:', matchDoc.exists);
         
         if (!matchDoc.exists) {
-            alert('❌ Không tìm thấy trận đấu!');
+            alert('❌ Không tìm thấy trận đấu với ID: ' + matchId);
             return;
         }
         
         const match = matchDoc.data();
+        console.log('📊 Match data:', match);
         
+        // Kiểm tra trận đấu đã kết thúc chưa
+        if (match.status === 'finished') {
+            alert('⚠️ Trận đấu đã có kết quả! Vui lòng xóa kết quả cũ trước khi nhập mới.');
+            return;
+        }
+
         // Hiển thị form
         document.getElementById('resultMatchId').value = matchId;
         document.getElementById('resultMatchName').textContent = `${match.homeTeam} vs ${match.awayTeam}`;
@@ -573,6 +260,9 @@ async function showResultForm(matchId) {
         if (form) {
             form.style.display = 'block';
             form.scrollIntoView({ behavior: 'smooth' });
+            console.log('✅ Form hiển thị thành công');
+        } else {
+            console.error('❌ Không tìm thấy form element');
         }
         
     } catch (error) {
@@ -581,17 +271,18 @@ async function showResultForm(matchId) {
     }
 }
 
-function cancelResultForm() {
-    document.getElementById('resultForm').style.display = 'none';
-}
-
-// js/admin.js - SỬA HÀM submitMatchResult
-
+// ============================================
+// SUBMIT MATCH RESULT - SỬA LỖI
+// ============================================
 async function submitMatchResult() {
+    console.log('🔍 submitMatchResult called');
+    
     const matchId = document.getElementById('resultMatchId').value;
     const homeScore = document.getElementById('resultHomeScore').value;
     const awayScore = document.getElementById('resultAwayScore').value;
     const note = document.getElementById('resultNote').value;
+
+    console.log('📊 Form data:', { matchId, homeScore, awayScore, note });
 
     if (!matchId) {
         alert('❌ Không tìm thấy ID trận đấu!');
@@ -603,18 +294,28 @@ async function submitMatchResult() {
         return;
     }
 
-    if (parseInt(homeScore) < 0 || parseInt(awayScore) < 0) {
+    const homeScoreInt = parseInt(homeScore);
+    const awayScoreInt = parseInt(awayScore);
+
+    if (isNaN(homeScoreInt) || isNaN(awayScoreInt)) {
+        alert('⚠️ Tỷ số phải là số!');
+        return;
+    }
+
+    if (homeScoreInt < 0 || awayScoreInt < 0) {
         alert('⚠️ Tỷ số không được nhỏ hơn 0!');
         return;
     }
 
-    if (!confirm(`Bạn có chắc muốn nhập kết quả:\n${homeScore} - ${awayScore}?\nSau khi nhập, hệ thống sẽ tự động tính điểm!`)) {
+    if (!confirm(`Bạn có chắc muốn nhập kết quả:\n${homeScoreInt} - ${awayScoreInt}?\nSau khi nhập, hệ thống sẽ tự động tính điểm!`)) {
         return;
     }
 
     try {
-        // Kiểm tra trận đấu tồn tại
         const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        
+        // Kiểm tra trận đấu tồn tại
         const matchDoc = await db.collection('matches').doc(matchId).get();
         
         if (!matchDoc.exists) {
@@ -629,32 +330,38 @@ async function submitMatchResult() {
             return;
         }
 
+        console.log('📝 Cập nhật kết quả...');
+
         // Cập nhật kết quả
         await db.collection('matches').doc(matchId).update({
-            homeScore: parseInt(homeScore),
-            awayScore: parseInt(awayScore),
+            homeScore: homeScoreInt,
+            awayScore: awayScoreInt,
             status: 'finished',
             isResultEntered: false,
-            resultEnteredBy: firebase.auth().currentUser?.uid || 'admin',
+            resultEnteredBy: user?.uid || 'admin',
             resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        console.log('✅ Đã cập nhật kết quả trận đấu');
+
         // Lưu lịch sử nhập kết quả
         await db.collection('match_results').add({
             matchId: matchId,
-            homeScore: parseInt(homeScore),
-            awayScore: parseInt(awayScore),
-            enteredBy: firebase.auth().currentUser?.uid || 'admin',
-            enteredByEmail: firebase.auth().currentUser?.email || 'admin',
+            homeScore: homeScoreInt,
+            awayScore: awayScoreInt,
+            enteredBy: user?.uid || 'admin',
+            enteredByEmail: user?.email || 'admin',
             note: note || `Nhập kết quả ${match.homeTeam} vs ${match.awayTeam}`,
             enteredAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
+        console.log('✅ Đã lưu lịch sử kết quả');
+
         // Log hành động
         await logAdminAction('enter_result', matchId, { 
-            homeScore, 
-            awayScore, 
+            homeScore: homeScoreInt, 
+            awayScore: awayScoreInt, 
             note,
             homeTeam: match.homeTeam,
             awayTeam: match.awayTeam
@@ -669,13 +376,15 @@ async function submitMatchResult() {
             alert('✅ Đã tính điểm thành công!');
         } catch (calcError) {
             console.warn('⚠️ Lỗi tính điểm:', calcError);
-            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công.');
+            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công hoặc thử lại.');
         }
 
         // Đóng form và reload
         cancelResultForm();
         await loadMatches();
         await loadDashboard();
+        
+        console.log('✅ Hoàn tất quá trình nhập kết quả');
 
     } catch (error) {
         console.error('❌ Lỗi nhập kết quả:', error);
@@ -683,8 +392,89 @@ async function submitMatchResult() {
     }
 }
 
-// js/admin.js - SỬA HÀM deleteMatchResult
+// ============================================
+// CANCEL RESULT FORM
+// ============================================
+function cancelResultForm() {
+    const form = document.getElementById('resultForm');
+    if (form) {
+        form.style.display = 'none';
+    }
+    // Reset các field
+    document.getElementById('resultMatchId').value = '';
+    document.getElementById('resultMatchName').textContent = '';
+    document.getElementById('resultHomeScore').value = '';
+    document.getElementById('resultAwayScore').value = '';
+    document.getElementById('resultNote').value = '';
+}
 
+// ============================================
+// VIEW MATCH RESULT
+// ============================================
+async function viewMatchResult(matchId) {
+    try {
+        const db = firebase.firestore();
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu');
+            return;
+        }
+        
+        const match = matchDoc.data();
+        
+        // Lấy lịch sử nhập kết quả
+        const resultSnap = await db.collection('match_results')
+            .where('matchId', '==', matchId)
+            .orderBy('enteredAt', 'desc')
+            .limit(1)
+            .get();
+
+        let resultInfo = 'Chưa có lịch sử nhập kết quả';
+        if (!resultSnap.empty) {
+            const result = resultSnap.docs[0].data();
+            resultInfo = `
+Nhập bởi: ${result.enteredByEmail || 'Admin'}
+Thời gian: ${result.enteredAt?.toDate?.()?.toLocaleString() || 'N/A'}
+Ghi chú: ${result.note || 'Không có'}
+            `;
+        }
+
+        // Đếm số dự đoán cho trận này
+        const predSnap = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .get();
+
+        const totalPredictions = predSnap.size;
+        let correctPredictions = 0;
+        predSnap.forEach(doc => {
+            if (doc.data().isCorrect) correctPredictions++;
+        });
+
+        alert(`
+📊 KẾT QUẢ TRẬN ĐẤU
+━━━━━━━━━━━━━━━━━━━━━━
+${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam}
+
+📝 CHI TIẾT:
+${resultInfo}
+
+⚡ Kèo chấp: ${match.handicap || 0}
+🏆 Trạng thái: ${match.status || 'N/A'}
+
+📊 THỐNG KÊ DỰ ĐOÁN:
+Tổng dự đoán: ${totalPredictions}
+Dự đoán đúng: ${correctPredictions}
+Tỷ lệ đúng: ${totalPredictions > 0 ? Math.round((correctPredictions/totalPredictions)*100) : 0}%
+        `);
+    } catch (error) {
+        console.error('❌ Lỗi xem kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// DELETE MATCH RESULT
+// ============================================
 async function deleteMatchResult(matchId) {
     if (!matchId) {
         alert('❌ Không tìm thấy ID trận đấu!');
@@ -811,71 +601,312 @@ async function deleteMatchResult(matchId) {
     }
 }
 
-async function viewMatchResult(matchId) {
+// ============================================
+// CRUD MATCHES
+// ============================================
+function showAddMatchForm() {
+    const form = document.getElementById('matchForm');
+    if (!form) return;
+    form.style.display = 'block';
+    document.getElementById('matchId').value = '';
+    document.getElementById('homeTeam').value = '';
+    document.getElementById('awayTeam').value = '';
+    document.getElementById('matchDate').value = '';
+    document.getElementById('matchTime').value = '';
+    document.getElementById('handicap').value = '0';
+    document.getElementById('group').value = '';
+    document.getElementById('homeScore').value = '';
+    document.getElementById('awayScore').value = '';
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelMatchForm() {
+    const form = document.getElementById('matchForm');
+    if (form) {
+        form.style.display = 'none';
+    }
+}
+
+async function saveMatch() {
+    const matchId = document.getElementById('matchId').value;
+    const data = {
+        homeTeam: document.getElementById('homeTeam').value.trim(),
+        awayTeam: document.getElementById('awayTeam').value.trim(),
+        date: document.getElementById('matchDate').value,
+        time: document.getElementById('matchTime').value,
+        handicap: parseFloat(document.getElementById('handicap').value) || 0,
+        group: document.getElementById('group').value.trim() || 'Group A',
+        homeScore: document.getElementById('homeScore').value ? parseInt(document.getElementById('homeScore').value) : null,
+        awayScore: document.getElementById('awayScore').value ? parseInt(document.getElementById('awayScore').value) : null,
+        status: document.getElementById('homeScore').value && document.getElementById('awayScore').value ? 'finished' : 'upcoming',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (!data.homeTeam || !data.awayTeam || !data.date || !data.time) {
+        alert('⚠️ Vui lòng nhập đầy đủ thông tin!');
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        if (matchId) {
+            await db.collection('matches').doc(matchId).update(data);
+            await logAdminAction('update_match', matchId, { homeTeam: data.homeTeam, awayTeam: data.awayTeam });
+            alert('✅ Cập nhật trận đấu thành công!');
+        } else {
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            data.createdBy = firebase.auth().currentUser.uid;
+            const docRef = await db.collection('matches').add(data);
+            await logAdminAction('create_match', docRef.id, { homeTeam: data.homeTeam, awayTeam: data.awayTeam });
+            alert('✅ Thêm trận đấu thành công!');
+        }
+        cancelMatchForm();
+        await loadMatches();
+        await loadDashboard();
+    } catch (error) {
+        console.error('Lỗi lưu trận đấu:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+async function editMatch(matchId) {
+    try {
+        const db = firebase.firestore();
+        const doc = await db.collection('matches').doc(matchId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            showAddMatchForm();
+            document.getElementById('matchId').value = matchId;
+            document.getElementById('homeTeam').value = data.homeTeam || '';
+            document.getElementById('awayTeam').value = data.awayTeam || '';
+            document.getElementById('matchDate').value = data.date || '';
+            document.getElementById('matchTime').value = data.time || '';
+            document.getElementById('handicap').value = data.handicap || 0;
+            document.getElementById('group').value = data.group || '';
+            document.getElementById('homeScore').value = data.homeScore || '';
+            document.getElementById('awayScore').value = data.awayScore || '';
+        }
+    } catch (error) {
+        console.error('Lỗi edit match:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+async function deleteMatch(matchId) {
+    if (!confirm('⚠️ Bạn có chắc muốn xóa trận đấu này?')) return;
+    
     try {
         const db = firebase.firestore();
         const matchDoc = await db.collection('matches').doc(matchId).get();
-        if (!matchDoc.exists) {
-            alert('❌ Không tìm thấy trận đấu');
-            return;
-        }
-        
         const match = matchDoc.data();
-        
-        // Lấy lịch sử nhập kết quả
-        const resultSnap = await db.collection('match_results')
-            .where('matchId', '==', matchId)
-            .orderBy('enteredAt', 'desc')
-            .limit(1)
-            .get();
-
-        let resultInfo = 'Chưa có lịch sử nhập kết quả';
-        if (!resultSnap.empty) {
-            const result = resultSnap.docs[0].data();
-            resultInfo = `
-                Nhập bởi: ${result.enteredByEmail || 'Admin'}\n
-                Thời gian: ${result.enteredAt?.toDate?.()?.toLocaleString() || 'N/A'}\n
-                Ghi chú: ${result.note || 'Không có'}
-            `;
-        }
-
-        alert(`
-📊 KẾT QUẢ TRẬN ĐẤU
-━━━━━━━━━━━━━━━━━━━━━━
-${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam}
-
-📝 CHI TIẾT:
-${resultInfo}
-
-⚡ Kèo chấp: ${match.handicap || 0}
-🏆 Trạng thái: ${match.status || 'N/A'}
-        `);
+        await db.collection('matches').doc(matchId).delete();
+        await logAdminAction('delete_match', matchId, { homeTeam: match?.homeTeam, awayTeam: match?.awayTeam });
+        alert('✅ Xóa trận đấu thành công!');
+        await loadMatches();
+        await loadDashboard();
     } catch (error) {
-        console.error('❌ Lỗi xem kết quả:', error);
+        console.error('Lỗi xóa trận:', error);
         alert('❌ Lỗi: ' + error.message);
     }
 }
 
 // ============================================
-// LOG ADMIN ACTIONS
+// LOAD USERS
 // ============================================
-async function logAdminAction(action, target, details) {
+async function loadUsers() {
+    const container = document.getElementById('userList');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
+    
     try {
         const db = firebase.firestore();
-        const user = firebase.auth().currentUser;
-        if (!user) return;
+        const snapshot = await db.collection('users')
+            .orderBy('totalPoints', 'desc')
+            .get();
         
-        await db.collection('audit_logs').add({
-            adminId: user.uid,
-            adminName: user.displayName || user.email,
-            adminEmail: user.email,
-            action: action,
-            target: target || null,
-            detail: JSON.stringify(details || {}),
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có người dùng nào</p>';
+            return;
+        }
+        
+        let html = '';
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            const isAdmin = ADMIN_EMAILS.includes(user.email);
+            
+            html += `
+                <div class="user-card">
+                    <div class="user-info">
+                        <span class="user-name">${user.name || 'N/A'}</span>
+                        <span class="user-email">${user.email || 'N/A'}</span>
+                    </div>
+                    <div class="user-stats">
+                        <span class="badge ${isAdmin ? 'badge-admin' : 'badge-user'}">${isAdmin ? 'Admin' : 'User'}</span>
+                        <span class="badge ${user.isActive !== false ? 'badge-active' : 'badge-locked'}">
+                            ${user.isActive !== false ? '✅ Active' : '🔒 Locked'}
+                        </span>
+                        <span>💰 ${user.balance || 0}</span>
+                        <span>⭐ ${user.totalPoints || 0}</span>
+                        <span>🎯 ${user.correctPredictions || 0}/${user.totalPredictions || 0}</span>
+                    </div>
+                </div>
+            `;
         });
+        container.innerHTML = html;
+        
     } catch (error) {
-        console.warn('⚠️ Không thể ghi log:', error.message);
+        console.error('Lỗi load users:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
+}
+
+// ============================================
+// LOAD PREDICTIONS
+// ============================================
+async function loadPredictions() {
+    const container = document.getElementById('predictionList');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
+    
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection('predictions')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có dự đoán nào</p>';
+            return;
+        }
+        
+        let html = `<div class="table-wrapper"><table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Trận</th>
+                    <th>Dự đoán</th>
+                    <th>Kèo chấp</th>
+                    <th>Điểm</th>
+                    <th>Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        for (const doc of snapshot.docs) {
+            const pred = doc.data();
+            let matchName = 'N/A';
+            try {
+                const matchDoc = await db.collection('matches').doc(pred.matchId).get();
+                if (matchDoc.exists) {
+                    const m = matchDoc.data();
+                    matchName = `${m.homeTeam} vs ${m.awayTeam}`;
+                }
+            } catch (e) {}
+            
+            const statusBadge = pred.isProcessed ? 
+                (pred.isCorrect ? '✅ Đúng' : '❌ Sai') : 
+                '⏳ Chờ xử lý';
+            
+            html += `
+                <tr>
+                    <td>${pred.userName || 'N/A'}</td>
+                    <td>${matchName}</td>
+                    <td style="text-align:center;font-weight:600;">${pred.homeScore} - ${pred.awayScore}</td>
+                    <td>${pred.userHandicap || 0} (${pred.handicapChoice || 'draw'})</td>
+                    <td style="text-align:center;font-weight:bold;color:${pred.points > 0 ? '#28a745' : '#dc3545'};">${pred.points || 0}</td>
+                    <td>${statusBadge}</td>
+                </tr>
+            `;
+        }
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Lỗi load predictions:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
+}
+
+// ============================================
+// LOAD LOGS
+// ============================================
+async function loadLogs() {
+    const container = document.getElementById('logList');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
+    
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection('audit_logs')
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:30px;color:#888;">
+                    <p>📭 Chưa có lịch sử hoạt động</p>
+                    <p style="font-size:13px;margin-top:5px;">Lịch sử sẽ được ghi lại khi admin thực hiện các thao tác</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `<div class="table-wrapper"><table>
+            <thead>
+                <tr>
+                    <th>Thời gian</th>
+                    <th>Admin</th>
+                    <th>Hành động</th>
+                    <th>Chi tiết</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        snapshot.forEach(doc => {
+            const log = doc.data();
+            let time = 'N/A';
+            if (log.timestamp && log.timestamp.toDate) {
+                time = log.timestamp.toDate().toLocaleString();
+            }
+            
+            const actionLabels = {
+                'create_match': '➕ Tạo trận đấu',
+                'update_match': '✏️ Cập nhật trận đấu',
+                'delete_match': '🗑️ Xóa trận đấu',
+                'enter_result': '📝 Nhập kết quả',
+                'delete_result': '🗑️ Xóa kết quả',
+                'lock_user': '🔒 Khóa user',
+                'unlock_user': '🔓 Mở khóa user',
+                'delete_user': '🗑️ Xóa user'
+            };
+            
+            html += `
+                <tr>
+                    <td style="font-size:13px;">${time}</td>
+                    <td>${log.adminName || log.adminEmail || 'N/A'}</td>
+                    <td>${actionLabels[log.action] || log.action || 'N/A'}</td>
+                    <td style="font-size:13px;color:#666;">${log.detail || ''}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.warn('⚠️ Lỗi load logs:', error.message);
+        container.innerHTML = `
+            <div style="text-align:center;padding:30px;color:#888;">
+                <p>📭 Chưa có lịch sử hoạt động</p>
+                <p style="font-size:13px;margin-top:5px;color:#aaa;">Lịch sử sẽ được ghi lại khi bạn thực hiện các thao tác quản trị</p>
+            </div>
+        `;
     }
 }
 
@@ -904,6 +935,29 @@ async function exportUsers() {
     } catch (error) {
         console.error('Lỗi export:', error);
         alert('❌ Lỗi export: ' + error.message);
+    }
+}
+
+// ============================================
+// LOG ADMIN ACTIONS
+// ============================================
+async function logAdminAction(action, target, details) {
+    try {
+        const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        if (!user) return;
+        
+        await db.collection('audit_logs').add({
+            adminId: user.uid,
+            adminName: user.displayName || user.email,
+            adminEmail: user.email,
+            action: action,
+            target: target || null,
+            detail: JSON.stringify(details || {}),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.warn('⚠️ Không thể ghi log:', error.message);
     }
 }
 
