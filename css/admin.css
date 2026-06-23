@@ -259,3 +259,35 @@
         gap: 10px;
     }
 }
+/* admin.css - Thêm style cho nút mới */
+
+.btn-info {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    font-size: 13px;
+}
+
+.btn-info:hover {
+    background: #138496;
+    transform: translateY(-2px);
+}
+
+.match-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.match-actions .btn-sm {
+    flex: 1;
+    min-width: 80px;
+    font-size: 12px;
+    padding: 6px 10px;
+}

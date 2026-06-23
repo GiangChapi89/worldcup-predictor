@@ -5,6 +5,9 @@ class MatchManager {
         this.unsubscribe = null;
     }
 
+    // ============================================
+    // LẮNG NGHE DỮ LIỆU TRẬN ĐẤU REAL-TIME
+    // ============================================
     listenMatches() {
         console.log('📡 Bắt đầu lắng nghe matches...');
         if (!db) {
@@ -33,6 +36,9 @@ class MatchManager {
             });
     }
 
+    // ============================================
+    // HIỂN THỊ DANH SÁCH TRẬN ĐẤU
+    // ============================================
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -81,7 +87,7 @@ class MatchManager {
     }
 
     // ============================================
-    // TÍNH ĐIỂM DỰA TRÊN KÈO CHẤP
+    // TÍNH ĐIỂM DỰA TRÊN KÈO CHẤP VÀ TỶ SỐ
     // ============================================
     async calculatePoints(matchId) {
         console.log('🧮 Bắt đầu tính điểm cho trận:', matchId);
@@ -102,24 +108,37 @@ class MatchManager {
                 return;
             }
 
+            if (match.isResultEntered) {
+                console.log('⚠️ Trận đấu đã được nhập kết quả và tính điểm');
+                return;
+            }
+
             // Lấy tất cả dự đoán cho trận này
             const predictionsSnap = await db.collection('predictions')
                 .where('matchId', '==', matchId)
+                .where('isProcessed', '==', false)
                 .get();
 
             if (predictionsSnap.empty) {
-                console.log('📭 Không có dự đoán nào cho trận này');
+                console.log('📭 Không có dự đoán mới nào cho trận này');
+                await matchDoc.ref.update({
+                    isResultEntered: true,
+                    resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
                 return;
             }
 
             const batch = db.batch();
             let totalCorrect = 0;
+            let totalPoints = 0;
+            const results = [];
 
+            // Duyệt từng dự đoán
             for (const doc of predictionsSnap.docs) {
                 const prediction = doc.data();
                 const userId = prediction.userId;
                 
-                // Tính điểm dựa trên kèo chấp
+                // Tính điểm dựa trên kèo chấp và tỷ số
                 const result = this.calculateMatchResult(match, prediction);
                 
                 // Cập nhật điểm cho dự đoán
@@ -127,18 +146,27 @@ class MatchManager {
                 batch.update(predRef, {
                     points: result.points,
                     isCorrect: result.isCorrect,
+                    isProcessed: true,
                     calculatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // Cập nhật điểm cho user
+                // Cập nhật số dư cho user
                 const userRef = db.collection('users').doc(userId);
                 if (result.points > 0) {
                     batch.update(userRef, {
+                        balance: firebase.firestore.FieldValue.increment(result.points),
                         totalPoints: firebase.firestore.FieldValue.increment(result.points),
-                        correctPredictions: firebase.firestore.FieldValue.increment(1)
+                        correctPredictions: firebase.firestore.FieldValue.increment(1),
+                        totalPredictions: firebase.firestore.FieldValue.increment(1)
                     });
                     totalCorrect++;
+                } else {
+                    batch.update(userRef, {
+                        balance: firebase.firestore.FieldValue.increment(-1),
+                        totalPredictions: firebase.firestore.FieldValue.increment(1)
+                    });
                 }
+                totalPoints += result.points;
 
                 // Lưu lịch sử dự đoán
                 const historyData = {
@@ -156,17 +184,51 @@ class MatchManager {
                     handicapChoice: prediction.handicapChoice || 'draw',
                     points: result.points,
                     isCorrect: result.isCorrect,
+                    detail: result.detail,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
                 const historyRef = db.collection('user_predictions_history').doc();
                 batch.set(historyRef, historyData);
+
+                results.push({
+                    userId: userId,
+                    userName: prediction.userName || 'Unknown',
+                    points: result.points,
+                    isCorrect: result.isCorrect,
+                    detail: result.detail
+                });
             }
 
+            // Đánh dấu trận đấu đã nhập kết quả
+            batch.update(matchDoc.ref, {
+                isResultEntered: true,
+                resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Commit tất cả cập nhật
             await batch.commit();
             
             console.log(`✅ Đã tính điểm cho ${predictionsSnap.size} dự đoán`);
             console.log(`📊 Số dự đoán đúng: ${totalCorrect}`);
+            console.log(`💰 Tổng điểm phân phối: ${totalPoints}`);
+            
+            // Log chi tiết kết quả
+            results.forEach(r => {
+                console.log(`  👤 ${r.userName}: ${r.points} điểm - ${r.detail}`);
+            });
+
+            // Cập nhật lại bảng xếp hạng
+            if (window.statisticsManager) {
+                await window.statisticsManager.loadRanking();
+            }
+
+            return {
+                totalPredictions: predictionsSnap.size,
+                totalCorrect: totalCorrect,
+                totalPoints: totalPoints,
+                results: results
+            };
 
         } catch (error) {
             console.error('❌ Lỗi tính điểm:', error);
@@ -192,31 +254,290 @@ class MatchManager {
         // 2. Kiểm tra kèo chấp
         const actualDiff = actualHome - actualAway;
         let isCorrectHandicap = false;
+        let detail = '';
+        let points = 0;
 
+        // Tính điểm dựa trên kèo chấp
         switch(handicapChoice) {
-            case 'home':
-                isCorrectHandicap = actualDiff > userHandicap;
+            case 'home': // Chọn đội nhà
+                if (actualDiff > userHandicap) {
+                    isCorrectHandicap = true;
+                    detail = `✅ ${match.homeTeam} thắng cách biệt ${actualDiff} > ${userHandicap}`;
+                } else if (actualDiff > 0 && actualDiff <= userHandicap) {
+                    // Thắng nhưng không đủ chấp
+                    isCorrectHandicap = false;
+                    detail = `⚠️ ${match.homeTeam} thắng nhưng không đủ chấp (${actualDiff} ≤ ${userHandicap})`;
+                    points = 0.5;
+                } else {
+                    isCorrectHandicap = false;
+                    detail = `❌ ${match.homeTeam} không thắng đủ chấp`;
+                }
                 break;
-            case 'away':
-                isCorrectHandicap = actualDiff < -userHandicap;
+                
+            case 'away': // Chọn đội khách
+                if (actualDiff < -userHandicap) {
+                    isCorrectHandicap = true;
+                    detail = `✅ ${match.awayTeam} thắng cách biệt ${Math.abs(actualDiff)} > ${userHandicap}`;
+                } else if (actualDiff < 0 && Math.abs(actualDiff) <= userHandicap) {
+                    // Thắng nhưng không đủ chấp
+                    isCorrectHandicap = false;
+                    detail = `⚠️ ${match.awayTeam} thắng nhưng không đủ chấp (${Math.abs(actualDiff)} ≤ ${userHandicap})`;
+                    points = 0.5;
+                } else {
+                    isCorrectHandicap = false;
+                    detail = `❌ ${match.awayTeam} không thắng đủ chấp`;
+                }
                 break;
-            case 'draw':
-                isCorrectHandicap = Math.abs(actualDiff) < userHandicap;
+                
+            case 'draw': // Chọn hòa
+                if (Math.abs(actualDiff) < userHandicap) {
+                    isCorrectHandicap = true;
+                    detail = `✅ Hòa với chấp ${userHandicap} (diff: ${actualDiff})`;
+                } else if (Math.abs(actualDiff) < userHandicap * 2) {
+                    // Gần hòa
+                    isCorrectHandicap = false;
+                    detail = `⚠️ Gần hòa nhưng không đủ (diff: ${actualDiff})`;
+                    points = 0.5;
+                } else {
+                    isCorrectHandicap = false;
+                    detail = `❌ Không hòa (diff: ${actualDiff})`;
+                }
                 break;
+                
             default:
                 isCorrectHandicap = true;
+                detail = 'Không chọn kèo chấp';
         }
 
         // 3. Tổng hợp kết quả
-        const isCorrect = isCorrectScore && isCorrectHandicap;
-        const points = isCorrect ? 1 : 0;
+        if (isCorrectScore && isCorrectHandicap) {
+            points = 1;
+            detail = `✅ Đúng tỷ số (${predHome}-${predAway}) và đúng kèo chấp! +1 điểm`;
+        } else if (isCorrectScore && !isCorrectHandicap) {
+            points = 0.5;
+            detail = `⚠️ Đúng tỷ số (${predHome}-${predAway}) nhưng sai kèo chấp! +0.5 điểm`;
+        } else if (!isCorrectScore && isCorrectHandicap) {
+            points = 0.5;
+            detail = `⚠️ Sai tỷ số nhưng đúng kèo chấp! +0.5 điểm`;
+        } else {
+            points = 0;
+            detail = `❌ Sai tỷ số và sai kèo chấp! 0 điểm`;
+        }
 
         return {
             points: points,
-            isCorrect: isCorrect,
+            isCorrect: points >= 0.5,
             isCorrectScore: isCorrectScore,
-            isCorrectHandicap: isCorrectHandicap
+            isCorrectHandicap: isCorrectHandicap,
+            detail: detail
         };
+    }
+
+    // ============================================
+    // NHẬP KẾT QUẢ TRẬN ĐẤU (ADMIN)
+    // ============================================
+    async enterMatchResult(matchId, homeScore, awayScore, adminNote = '') {
+        try {
+            const db = firebase.firestore();
+            const user = firebase.auth().currentUser;
+            
+            if (!user) {
+                throw new Error('Vui lòng đăng nhập để nhập kết quả');
+            }
+
+            // Kiểm tra quyền admin
+            const isAdmin = await this.checkIsAdmin(user);
+            if (!isAdmin) {
+                throw new Error('Bạn không có quyền nhập kết quả');
+            }
+
+            // Lấy thông tin trận đấu
+            const matchRef = db.collection('matches').doc(matchId);
+            const matchDoc = await matchRef.get();
+            
+            if (!matchDoc.exists) {
+                throw new Error('Không tìm thấy trận đấu');
+            }
+
+            const match = matchDoc.data();
+            
+            if (match.status === 'finished') {
+                throw new Error('Trận đấu đã có kết quả');
+            }
+
+            // Validate tỷ số
+            if (homeScore < 0 || awayScore < 0) {
+                throw new Error('Tỷ số không được nhỏ hơn 0');
+            }
+
+            // Cập nhật kết quả
+            await matchRef.update({
+                homeScore: parseInt(homeScore),
+                awayScore: parseInt(awayScore),
+                status: 'finished',
+                isResultEntered: false,
+                resultEnteredBy: user.uid,
+                resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Lưu lịch sử nhập kết quả
+            await db.collection('match_results').add({
+                matchId: matchId,
+                homeScore: parseInt(homeScore),
+                awayScore: parseInt(awayScore),
+                enteredBy: user.uid,
+                enteredByEmail: user.email,
+                note: adminNote || `Nhập kết quả ${match.homeTeam} vs ${match.awayTeam}`,
+                enteredAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            console.log('✅ Đã nhập kết quả trận đấu');
+
+            // Tự động tính điểm
+            const result = await this.calculatePoints(matchId);
+
+            return {
+                success: true,
+                message: 'Đã nhập kết quả và tính điểm thành công',
+                result: result
+            };
+
+        } catch (error) {
+            console.error('❌ Lỗi nhập kết quả:', error);
+            throw error;
+        }
+    }
+
+    // ============================================
+    // KIỂM TRA QUYỀN ADMIN
+    // ============================================
+    async checkIsAdmin(user) {
+        if (!user) return false;
+        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
+        return adminEmails.includes(user.email);
+    }
+
+    // ============================================
+    // XÓA KẾT QUẢ TRẬN ĐẤU (ADMIN)
+    // ============================================
+    async deleteMatchResult(matchId) {
+        try {
+            const db = firebase.firestore();
+            const user = firebase.auth().currentUser;
+            
+            if (!user) {
+                throw new Error('Vui lòng đăng nhập');
+            }
+
+            const isAdmin = await this.checkIsAdmin(user);
+            if (!isAdmin) {
+                throw new Error('Bạn không có quyền xóa kết quả');
+            }
+
+            const matchRef = db.collection('matches').doc(matchId);
+            const matchDoc = await matchRef.get();
+            
+            if (!matchDoc.exists) {
+                throw new Error('Không tìm thấy trận đấu');
+            }
+
+            const match = matchDoc.data();
+            
+            if (match.status !== 'finished') {
+                throw new Error('Trận đấu chưa có kết quả để xóa');
+            }
+            
+            // Reset kết quả
+            await matchRef.update({
+                homeScore: null,
+                awayScore: null,
+                status: 'upcoming',
+                isResultEntered: false,
+                resultEnteredBy: null,
+                resultEnteredAt: null,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Xóa các dự đoán đã xử lý
+            const predictionsSnap = await db.collection('predictions')
+                .where('matchId', '==', matchId)
+                .where('isProcessed', '==', true)
+                .get();
+
+            const batch = db.batch();
+            
+            predictionsSnap.forEach(doc => {
+                batch.update(doc.ref, {
+                    points: 0,
+                    isCorrect: false,
+                    isProcessed: false,
+                    calculatedAt: null
+                });
+            });
+
+            // Reset lại số dư cho user
+            const allPredictions = await db.collection('predictions')
+                .where('matchId', '==', matchId)
+                .get();
+
+            const userBatch = db.batch();
+            const userPoints = new Map();
+            
+            allPredictions.forEach(doc => {
+                const pred = doc.data();
+                if (!userPoints.has(pred.userId)) {
+                    userPoints.set(pred.userId, {
+                        points: pred.points || 0,
+                        isCorrect: pred.isCorrect || false
+                    });
+                }
+            });
+
+            // Trả lại điểm cho user
+            for (const [userId, data] of userPoints) {
+                const userRef = db.collection('users').doc(userId);
+                if (data.points > 0) {
+                    userBatch.update(userRef, {
+                        balance: firebase.firestore.FieldValue.increment(-data.points),
+                        totalPoints: firebase.firestore.FieldValue.increment(-data.points),
+                        correctPredictions: firebase.firestore.FieldValue.increment(data.isCorrect ? -1 : 0)
+                    });
+                } else {
+                    userBatch.update(userRef, {
+                        balance: firebase.firestore.FieldValue.increment(1)
+                    });
+                }
+            }
+
+            // Xóa lịch sử dự đoán cho trận này
+            const historySnap = await db.collection('user_predictions_history')
+                .where('matchId', '==', matchId)
+                .get();
+
+            historySnap.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+            await userBatch.commit();
+
+            console.log('✅ Đã xóa kết quả và reset dữ liệu');
+
+            // Cập nhật lại bảng xếp hạng
+            if (window.statisticsManager) {
+                await window.statisticsManager.loadRanking();
+            }
+
+            return {
+                success: true,
+                message: 'Đã xóa kết quả và reset dữ liệu thành công'
+            };
+
+        } catch (error) {
+            console.error('❌ Lỗi xóa kết quả:', error);
+            throw error;
+        }
     }
 
     // ============================================
@@ -226,6 +547,7 @@ class MatchManager {
         try {
             const db = firebase.firestore();
             
+            // Lấy thông tin trận đấu
             const matchDoc = await db.collection('matches').doc(matchId).get();
             if (!matchDoc.exists) {
                 alert('❌ Không tìm thấy trận đấu');
@@ -233,15 +555,16 @@ class MatchManager {
             }
             const match = matchDoc.data();
 
-            const userId = firebase.auth().currentUser?.uid;
-            if (!userId) {
+            // Lấy dự đoán của user hiện tại
+            const user = firebase.auth().currentUser;
+            if (!user) {
                 alert('Vui lòng đăng nhập để xem chi tiết');
                 return;
             }
 
             const predSnap = await db.collection('predictions')
                 .where('matchId', '==', matchId)
-                .where('userId', '==', userId)
+                .where('userId', '==', user.uid)
                 .get();
 
             let prediction = null;
@@ -249,7 +572,25 @@ class MatchManager {
                 prediction = predSnap.docs[0].data();
             }
 
-            this.showMatchDetailModal(match, prediction);
+            // Lấy lịch sử nhập kết quả
+            const resultSnap = await db.collection('match_results')
+                .where('matchId', '==', matchId)
+                .orderBy('enteredAt', 'desc')
+                .limit(1)
+                .get();
+
+            let resultInfo = 'Chưa có';
+            if (!resultSnap.empty) {
+                const result = resultSnap.docs[0].data();
+                resultInfo = `
+                    Nhập bởi: ${result.enteredByEmail || 'Admin'}<br>
+                    Thời gian: ${result.enteredAt?.toDate?.()?.toLocaleString() || 'N/A'}<br>
+                    Ghi chú: ${result.note || 'Không có'}
+                `;
+            }
+
+            // Hiển thị modal chi tiết
+            this.showMatchDetailModal(match, prediction, resultInfo);
 
         } catch (error) {
             console.error('❌ Lỗi xem chi tiết:', error);
@@ -257,10 +598,13 @@ class MatchManager {
         }
     }
 
-    showMatchDetailModal(match, prediction) {
+    // ============================================
+    // HIỂN THỊ MODAL CHI TIẾT
+    // ============================================
+    showMatchDetailModal(match, prediction, resultInfo) {
         const modalHtml = `
             <div id="matchDetailModal" class="modal" style="display:block;">
-                <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
                     <span class="close" onclick="document.getElementById('matchDetailModal').remove()">&times;</span>
                     <h2 style="text-align:center;margin-bottom:20px;">📊 Chi Tiết Trận Đấu</h2>
                     
@@ -284,10 +628,19 @@ class MatchManager {
                         <div style="background:#f0f2f5;padding:15px;border-radius:8px;">
                             <div style="font-weight:bold;color:#666;">🏆 Kết quả</div>
                             <div style="font-size:1.2rem;font-weight:bold;color:#2d3436;">
-                                ${match.homeScore} - ${match.awayScore}
+                                ${match.status === 'finished' ? 
+                                    `${match.homeScore} - ${match.awayScore}` : 
+                                    '⏳ Chưa có kết quả'}
                             </div>
                         </div>
                     </div>
+
+                    ${match.status === 'finished' ? `
+                        <div style="margin-top:15px;background:#e8f4fd;padding:15px;border-radius:8px;">
+                            <div style="font-weight:bold;color:#666;">📝 Lịch sử nhập kết quả</div>
+                            <div style="font-size:0.9rem;margin-top:5px;">${resultInfo}</div>
+                        </div>
+                    ` : ''}
 
                     ${prediction ? `
                         <div style="margin-top:20px;padding:15px;border-radius:8px;background:${prediction.isCorrect ? '#d4edda' : '#f8d7da'};">
@@ -298,9 +651,20 @@ class MatchManager {
                                 <div><strong>Chọn:</strong> ${prediction.handicapChoice || 'draw'}</div>
                                 <div><strong>Điểm:</strong> ${prediction.points || 0}</div>
                             </div>
-                            <div style="margin-top:10px;font-weight:bold;color:${prediction.isCorrect ? '#28a745' : '#dc3545'};">
-                                ${prediction.isCorrect ? '✅ Dự đoán đúng!' : '❌ Dự đoán sai'}
-                            </div>
+                            ${prediction.isProcessed ? `
+                                <div style="margin-top:10px;font-weight:bold;color:${prediction.isCorrect ? '#28a745' : '#dc3545'};">
+                                    ${prediction.isCorrect ? '✅ Dự đoán đúng!' : '❌ Dự đoán sai'}
+                                </div>
+                                ${prediction.calculatedAt ? `
+                                    <div style="margin-top:5px;font-size:0.8rem;color:#888;">
+                                        Tính điểm lúc: ${prediction.calculatedAt?.toDate?.()?.toLocaleString() || 'N/A'}
+                                    </div>
+                                ` : ''}
+                            ` : `
+                                <div style="margin-top:10px;font-weight:bold;color:#ffc107;">
+                                    ⏳ Chờ tính điểm...
+                                </div>
+                            `}
                         </div>
                     ` : `
                         <div style="margin-top:20px;padding:15px;border-radius:8px;background:#fff3cd;">
@@ -330,6 +694,9 @@ class MatchManager {
         }, 100);
     }
 
+    // ============================================
+    // DỪNG LẮNG NGHE
+    // ============================================
     stopListening() {
         if (this.unsubscribe) {
             this.unsubscribe();
@@ -343,4 +710,9 @@ class MatchManager {
 async function viewMatchHistory(matchId) {
     const matchManager = new MatchManager();
     await matchManager.viewMatchHistory(matchId);
+}
+
+// Export cho các file khác sử dụng
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = MatchManager;
 }

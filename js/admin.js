@@ -502,3 +502,136 @@ if (document.readyState === 'loading') {
 } else {
     checkAdmin();
 }
+
+// js/admin.js - Thêm các hàm mới
+
+// ============================================
+// HIỂN THỊ FORM NHẬP KẾT QUẢ
+// ============================================
+function showResultForm(matchId) {
+    const form = document.getElementById('resultForm');
+    const match = window.matchManager?.matches?.find(m => m.id === matchId);
+    
+    if (!match) {
+        alert('❌ Không tìm thấy trận đấu');
+        return;
+    }
+
+    document.getElementById('resultMatchId').value = matchId;
+    document.getElementById('resultMatchName').textContent = `${match.homeTeam} vs ${match.awayTeam}`;
+    document.getElementById('resultHomeScore').value = '';
+    document.getElementById('resultAwayScore').value = '';
+    document.getElementById('resultNote').value = '';
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelResultForm() {
+    document.getElementById('resultForm').style.display = 'none';
+}
+
+// ============================================
+= SUBMIT KẾT QUẢ
+// ============================================
+async function submitMatchResult() {
+    const matchId = document.getElementById('resultMatchId').value;
+    const homeScore = document.getElementById('resultHomeScore').value;
+    const awayScore = document.getElementById('resultAwayScore').value;
+    const note = document.getElementById('resultNote').value;
+
+    if (!homeScore || !awayScore) {
+        alert('⚠️ Vui lòng nhập đầy đủ tỷ số!');
+        return;
+    }
+
+    if (homeScore < 0 || awayScore < 0) {
+        alert('⚠️ Tỷ số không được nhỏ hơn 0!');
+        return;
+    }
+
+    if (!confirm(`Bạn có chắc muốn nhập kết quả:\n${homeScore} - ${awayScore}?\nSau khi nhập, hệ thống sẽ tự động tính điểm!`)) {
+        return;
+    }
+
+    try {
+        const matchManager = new MatchManager();
+        const result = await matchManager.enterMatchResult(matchId, homeScore, awayScore, note);
+        
+        if (result.success) {
+            alert('✅ ' + result.message);
+            cancelResultForm();
+            await loadMatches();
+            await loadDashboard();
+        }
+    } catch (error) {
+        console.error('❌ Lỗi nhập kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// XÓA KẾT QUẢ
+// ============================================
+async function deleteMatchResult(matchId) {
+    if (!confirm('⚠️ Bạn có chắc muốn xóa kết quả trận đấu?\nHành động này sẽ reset tất cả dữ liệu và điểm số liên quan!')) {
+        return;
+    }
+
+    try {
+        const matchManager = new MatchManager();
+        const result = await matchManager.deleteMatchResult(matchId);
+        
+        if (result.success) {
+            alert('✅ ' + result.message);
+            await loadMatches();
+            await loadDashboard();
+        }
+    } catch (error) {
+        console.error('❌ Lỗi xóa kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// XEM KẾT QUẢ
+// ============================================
+async function viewMatchResult(matchId) {
+    try {
+        const db = firebase.firestore();
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu');
+            return;
+        }
+        
+        const match = matchDoc.data();
+        
+        // Lấy lịch sử nhập kết quả
+        const resultSnap = await db.collection('match_results')
+            .where('matchId', '==', matchId)
+            .orderBy('enteredAt', 'desc')
+            .limit(1)
+            .get();
+
+        let resultInfo = 'Chưa có lịch sử nhập kết quả';
+        if (!resultSnap.empty) {
+            const result = resultSnap.docs[0].data();
+            resultInfo = `
+                Nhập bởi: ${result.enteredByEmail || 'Admin'}\n
+                Thời gian: ${result.enteredAt?.toDate?.()?.toLocaleString() || 'N/A'}\n
+                Ghi chú: ${result.note || 'Không có'}
+            `;
+        }
+
+        alert(`
+📊 Kết quả trận đấu:
+${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam}
+
+📝 Chi tiết:
+${resultInfo}
+        `);
+    } catch (error) {
+        console.error('❌ Lỗi xem kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
