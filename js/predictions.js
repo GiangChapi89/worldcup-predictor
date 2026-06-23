@@ -214,8 +214,8 @@ function updateHandicapOptions(choice, defaultHandicap) {
         ];
         if (note) {
             note.innerHTML = '⚠️ Khi chọn "Hòa", chỉ có kèo đồng banh (0)';
-            note.style.color = '#ffc107';
-            note.style.background = '#fff3cd';
+            note.style.color = '#0c5460';
+            note.style.background = '#d1ecf1';
             note.style.padding = '5px 10px';
             note.style.borderRadius = '5px';
         }
