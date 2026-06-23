@@ -531,7 +531,7 @@ function cancelResultForm() {
 }
 
 // ============================================
-= SUBMIT KẾT QUẢ
+// SUBMIT KẾT QUẢ
 // ============================================
 async function submitMatchResult() {
     const matchId = document.getElementById('resultMatchId').value;
