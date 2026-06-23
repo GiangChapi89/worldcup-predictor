@@ -62,54 +62,143 @@ class MatchManager {
     }
 
     // Trong matches.js - calculatePoints
-    async calculatePoints(matchId) {
-        const matchDoc = await db.collection('matches').doc(matchId).get();
-        const match = matchDoc.data();
+    // TÍNH ĐIỂM DỰA TRÊN KÈO CHẤP
+    // ============================================
+    async function calculatePoints(matchId) {
+        console.log('🧮 Bắt đầu tính điểm cho trận:', matchId);
         
-        const predictionsSnap = await db.collection('predictions')
-            .where('matchId', '==', matchId)
-            .get();
-        
-        const batch = db.batch();
-        
-        predictionsSnap.forEach(doc => {
-            const pred = doc.data();
-            const isCorrectScore = pred.homeScore === match.homeScore && 
-                                  pred.awayScore === match.awayScore;
+        try {
+            const db = firebase.firestore();
             
-            // Xử lý chấp trái
-            let isCorrectHandicap = true;
-            if (match.handicap > 0 && pred.handicapChoice) {
-                const diff = match.homeScore - match.awayScore;
-                switch(pred.handicapChoice) {
-                    case 'home':
-                        isCorrectHandicap = diff > match.handicap;
-                        break;
-                    case 'away':
-                        isCorrectHandicap = diff < -match.handicap;
-                        break;
-                    case 'draw':
-                        isCorrectHandicap = Math.abs(diff) < match.handicap;
-                        break;
-                }
+            // Lấy thông tin trận đấu
+            const matchDoc = await db.collection('matches').doc(matchId).get();
+            if (!matchDoc.exists) {
+                console.error('❌ Không tìm thấy trận đấu');
+                return;
             }
             
-            const isCorrect = isCorrectScore && isCorrectHandicap;
-            
-            if (isCorrect) {
-                const userRef = db.collection('users').doc(pred.userId);
-                batch.update(userRef, {
-                    totalPoints: firebase.firestore.FieldValue.increment(1),
-                    correctPredictions: firebase.firestore.FieldValue.increment(1)
-                });
+            const match = matchDoc.data();
+            if (match.status !== 'finished') {
+                console.log('⚠️ Trận đấu chưa kết thúc, bỏ qua tính điểm');
+                return;
+            }
+
+            // Lấy tất cả dự đoán cho trận này
+            const predictionsSnap = await db.collection('predictions')
+                .where('matchId', '==', matchId)
+                .get();
+
+            if (predictionsSnap.empty) {
+                console.log('📭 Không có dự đoán nào cho trận này');
+                return;
+            }
+
+            const batch = db.batch();
+            let totalCorrect = 0;
+
+            // Duyệt từng dự đoán
+            for (const doc of predictionsSnap.docs) {
+                const prediction = doc.data();
+                const userId = prediction.userId;
                 
-                batch.update(doc.ref, {
-                    points: 1,
-                    isCorrect: true
+                // Tính điểm dựa trên kèo chấp
+                const result = calculateMatchResult(match, prediction);
+                
+                // Cập nhật điểm cho dự đoán
+                const predRef = db.collection('predictions').doc(doc.id);
+                batch.update(predRef, {
+                    points: result.points,
+                    isCorrect: result.isCorrect,
+                    calculatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+
+                // Cập nhật điểm cho user
+                const userRef = db.collection('users').doc(userId);
+                if (result.points > 0) {
+                    batch.update(userRef, {
+                        totalPoints: firebase.firestore.FieldValue.increment(result.points),
+                        correctPredictions: firebase.firestore.FieldValue.increment(1)
+                    });
+                    totalCorrect++;
+                }
+
+                // Lưu lịch sử dự đoán
+                const historyData = {
+                    userId: userId,
+                    matchId: matchId,
+                    matchDate: match.date,
+                    homeTeam: match.homeTeam,
+                    awayTeam: match.awayTeam,
+                    predictedHomeScore: prediction.homeScore,
+                    predictedAwayScore: prediction.awayScore,
+                    actualHomeScore: match.homeScore,
+                    actualAwayScore: match.awayScore,
+                    handicap: match.handicap || 0,
+                    userHandicap: prediction.userHandicap || match.handicap || 0,
+                    handicapChoice: prediction.handicapChoice || 'draw',
+                    points: result.points,
+                    isCorrect: result.isCorrect,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                const historyRef = db.collection('user_predictions_history').doc();
+                batch.set(historyRef, historyData);
             }
-        });
+
+            // Commit tất cả cập nhật
+            await batch.commit();
+            
+            console.log(`✅ Đã tính điểm cho ${predictionsSnap.size} dự đoán`);
+            console.log(`📊 Số dự đoán đúng: ${totalCorrect}`);
+
+        } catch (error) {
+            console.error('❌ Lỗi tính điểm:', error);
+            throw error;
+        }
+    }
+
+    // ============================================
+    // TÍNH KẾT QUẢ DỰA TRÊN KÈO CHẤP
+    // ============================================
+    function calculateMatchResult(match, prediction) {
+        const actualHome = match.homeScore;
+        const actualAway = match.awayScore;
+        const predHome = prediction.homeScore;
+        const predAway = prediction.awayScore;
+        const handicap = match.handicap || 0;
+        const userHandicap = prediction.userHandicap || handicap;
+        const handicapChoice = prediction.handicapChoice || 'draw';
+
+        // 1. Kiểm tra dự đoán đúng tỷ số
+        const isCorrectScore = (predHome === actualHome && predAway === actualAway);
         
-        await batch.commit();
+        // 2. Kiểm tra kèo chấp
+        const actualDiff = actualHome - actualAway;
+        let isCorrectHandicap = false;
+
+        switch(handicapChoice) {
+            case 'home':
+                isCorrectHandicap = actualDiff > userHandicap;
+                break;
+            case 'away':
+                isCorrectHandicap = actualDiff < -userHandicap;
+                break;
+            case 'draw':
+                isCorrectHandicap = Math.abs(actualDiff) < userHandicap;
+                break;
+            default:
+                isCorrectHandicap = true;
+        }
+
+        // 3. Tổng hợp kết quả
+        const isCorrect = isCorrectScore && isCorrectHandicap;
+        const points = isCorrect ? 1 : 0;
+
+        return {
+            points: points,
+            isCorrect: isCorrect,
+            isCorrectScore: isCorrectScore,
+            isCorrectHandicap: isCorrectHandicap
+        };
     }
 }

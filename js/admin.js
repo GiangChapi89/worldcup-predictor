@@ -369,6 +369,8 @@ function cancelMatchForm() {
     }
 }
 
+// js/admin.js - CẬP NHẬT HÀM saveMatch
+
 async function saveMatch() {
     const matchId = document.getElementById('matchId').value;
     const data = {
@@ -376,7 +378,7 @@ async function saveMatch() {
         awayTeam: document.getElementById('awayTeam').value.trim(),
         date: document.getElementById('matchDate').value,
         time: document.getElementById('matchTime').value,
-        handicap: parseFloat(document.getElementById('handicap').value) || 0,
+        handicap: parseFloat(document.getElementById('handicap').value) || 0, // THÊM FIELD NÀY
         group: document.getElementById('group').value.trim() || 'Group A',
         homeScore: document.getElementById('homeScore').value ? parseInt(document.getElementById('homeScore').value) : null,
         awayScore: document.getElementById('awayScore').value ? parseInt(document.getElementById('awayScore').value) : null,
@@ -394,10 +396,15 @@ async function saveMatch() {
         if (matchId) {
             await db.collection('matches').doc(matchId).update(data);
             alert('✅ Cập nhật trận đấu thành công!');
+            
+            // Nếu trận đấu kết thúc, tính điểm
+            if (data.status === 'finished') {
+                await calculatePoints(matchId);
+            }
         } else {
             data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             data.createdBy = firebase.auth().currentUser.uid;
-            await db.collection('matches').add(data);
+            const docRef = await db.collection('matches').add(data);
             alert('✅ Thêm trận đấu thành công!');
         }
         cancelMatchForm();
