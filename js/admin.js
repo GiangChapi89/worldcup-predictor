@@ -274,6 +274,8 @@ async function showResultForm(matchId) {
 // ============================================
 // SUBMIT MATCH RESULT - SỬA LỖI
 // ============================================
+// js/admin.js - SỬA HÀM submitMatchResult
+
 async function submitMatchResult() {
     console.log('🔍 submitMatchResult called');
     
@@ -315,6 +317,13 @@ async function submitMatchResult() {
         const db = firebase.firestore();
         const user = firebase.auth().currentUser;
         
+        // Kiểm tra quyền admin
+        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
+        if (!adminEmails.includes(user?.email)) {
+            alert('❌ Bạn không có quyền nhập kết quả!');
+            return;
+        }
+        
         // Kiểm tra trận đấu tồn tại
         const matchDoc = await db.collection('matches').doc(matchId).get();
         
@@ -330,8 +339,6 @@ async function submitMatchResult() {
             return;
         }
 
-        console.log('📝 Cập nhật kết quả...');
-
         // Cập nhật kết quả
         await db.collection('matches').doc(matchId).update({
             homeScore: homeScoreInt,
@@ -342,8 +349,6 @@ async function submitMatchResult() {
             resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-
-        console.log('✅ Đã cập nhật kết quả trận đấu');
 
         // Lưu lịch sử nhập kết quả
         await db.collection('match_results').add({
@@ -356,8 +361,6 @@ async function submitMatchResult() {
             enteredAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        console.log('✅ Đã lưu lịch sử kết quả');
-
         // Log hành động
         await logAdminAction('enter_result', matchId, { 
             homeScore: homeScoreInt, 
@@ -369,14 +372,20 @@ async function submitMatchResult() {
 
         alert('✅ Đã nhập kết quả thành công! Đang tính điểm...');
 
-        // Tính điểm
+        // 🔧 TÍNH ĐIỂM - SỬA LỖI
         try {
-            const matchManager = new MatchManager();
-            await matchManager.calculatePoints(matchId);
-            alert('✅ Đã tính điểm thành công!');
+            // Kiểm tra MatchManager có tồn tại không
+            if (typeof MatchManager !== 'undefined') {
+                const matchManager = new MatchManager();
+                await matchManager.calculatePoints(matchId);
+                alert('✅ Đã tính điểm thành công!');
+            } else {
+                console.warn('⚠️ MatchManager không tồn tại, bỏ qua tính điểm tự động');
+                alert('⚠️ Đã nhập kết quả thành công! Vui lòng tính điểm thủ công.');
+            }
         } catch (calcError) {
             console.warn('⚠️ Lỗi tính điểm:', calcError);
-            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công hoặc thử lại.');
+            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công.');
         }
 
         // Đóng form và reload
@@ -834,6 +843,8 @@ async function loadPredictions() {
 // ============================================
 // LOAD LOGS
 // ============================================
+// js/admin.js - SỬA HÀM loadLogs
+
 async function loadLogs() {
     const container = document.getElementById('logList');
     if (!container) return;
@@ -842,8 +853,9 @@ async function loadLogs() {
     
     try {
         const db = firebase.firestore();
+        
+        // 🔧 SỬA: Không dùng orderBy để tránh cần index
         const snapshot = await db.collection('audit_logs')
-            .orderBy('timestamp', 'desc')
             .limit(20)
             .get();
         
@@ -857,6 +869,19 @@ async function loadLogs() {
             return;
         }
         
+        // Sắp xếp trong JavaScript thay vì Firestore
+        const logs = [];
+        snapshot.forEach(doc => {
+            logs.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sắp xếp theo timestamp giảm dần
+        logs.sort((a, b) => {
+            const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+            const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+            return timeB - timeA;
+        });
+        
         let html = `<div class="table-wrapper"><table>
             <thead>
                 <tr>
@@ -868,8 +893,7 @@ async function loadLogs() {
             </thead>
             <tbody>`;
         
-        snapshot.forEach(doc => {
-            const log = doc.data();
+        logs.forEach(log => {
             let time = 'N/A';
             if (log.timestamp && log.timestamp.toDate) {
                 time = log.timestamp.toDate().toLocaleString();
