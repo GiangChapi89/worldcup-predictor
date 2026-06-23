@@ -91,8 +91,6 @@ class MatchManager {
     // ============================================
     // js/matches.js - CẬP NHẬT HÀM calculatePoints
 
-    // js/matches.js - SỬA HÀM calculatePoints
-
     async calculatePoints(matchId) {
         console.log('🧮 Bắt đầu tính điểm cho trận:', matchId);
         
@@ -112,6 +110,15 @@ class MatchManager {
             if (match.status !== 'finished') {
                 console.log('⚠️ Trận đấu chưa kết thúc, bỏ qua tính điểm');
                 return null;
+            }
+
+            // ⚠️ KIỂM TRA ĐÃ TÍNH ĐIỂM CHƯA
+            if (match.isResultEntered === true) {
+                console.log('⚠️ Trận đấu đã được tính điểm rồi! Bỏ qua.');
+                return {
+                    alreadyCalculated: true,
+                    message: 'Trận đấu đã được tính điểm trước đó'
+                };
             }
 
             // Lấy tất cả dự đoán cho trận này
@@ -140,6 +147,12 @@ class MatchManager {
                 const prediction = doc.data();
                 const userId = prediction.userId;
                 
+                // Chỉ xử lý dự đoán chưa được xử lý
+                if (prediction.isProcessed === true) {
+                    console.log(`⏭️ Bỏ qua dự đoán đã xử lý của user: ${userId}`);
+                    continue;
+                }
+                
                 console.log(`👤 Xử lý dự đoán của user: ${userId}`);
                 console.log(`📝 Dự đoán: ${prediction.homeScore} - ${prediction.awayScore}`);
                 console.log(`📊 Kết quả thực tế: ${match.homeScore} - ${match.awayScore}`);
@@ -159,10 +172,6 @@ class MatchManager {
 
                 // Cập nhật số dư cho user
                 const userRef = db.collection('users').doc(userId);
-                
-                // Lấy thông tin user hiện tại
-                const userDoc = await userRef.get();
-                const userData = userDoc.exists ? userDoc.data() : {};
                 
                 if (result.points > 0) {
                     batch.update(userRef, {
@@ -243,7 +252,8 @@ class MatchManager {
                 totalPredictions: predictionsSnap.size,
                 totalCorrect: totalCorrect,
                 totalPoints: totalPoints,
-                results: results
+                results: results,
+                alreadyCalculated: false
             };
 
         } catch (error) {

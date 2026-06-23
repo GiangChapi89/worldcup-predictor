@@ -278,6 +278,8 @@ async function showResultForm(matchId) {
 // ============================================
 // SUBMIT MATCH RESULT - CẬP NHẬT
 // ============================================
+// js/admin.js - SỬA HÀM submitMatchResult
+
 async function submitMatchResult() {
     console.log('🔍 submitMatchResult called');
     
@@ -343,12 +345,12 @@ async function submitMatchResult() {
 
         console.log('📝 Cập nhật kết quả trận đấu...');
 
-        // 1. Cập nhật kết quả trận đấu
+        // 1. Cập nhật kết quả trận đấu (isResultEntered = false để chờ tính điểm)
         await db.collection('matches').doc(matchId).update({
             homeScore: homeScoreInt,
             awayScore: awayScoreInt,
             status: 'finished',
-            isResultEntered: false,
+            isResultEntered: false,  // Chưa tính điểm
             resultEnteredBy: user?.uid || 'admin',
             resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -381,11 +383,11 @@ async function submitMatchResult() {
         // 4. Đóng form
         cancelResultForm();
 
-        // 5. TÍNH ĐIỂM - QUAN TRỌNG
-        console.log('🧮 Bắt đầu tính điểm...');
+        // 5. TỰ ĐỘNG TÍNH ĐIỂM - QUAN TRỌNG
+        console.log('🧮 Tự động tính điểm...');
         
         try {
-            // Kiểm tra MatchManager có tồn tại
+            // Kiểm tra MatchManager
             if (typeof MatchManager === 'undefined') {
                 console.error('❌ MatchManager không tồn tại!');
                 alert('⚠️ Lỗi: Không tìm thấy MatchManager. Vui lòng kiểm tra file matches.js');
@@ -403,7 +405,11 @@ async function submitMatchResult() {
             console.log('📊 Kết quả tính điểm:', result);
             
             if (result) {
-                alert(`✅ Đã nhập kết quả và tính điểm thành công!\n📊 Số dự đoán: ${result.totalPredictions}\n✅ Dự đoán đúng: ${result.totalCorrect}\n💰 Tổng điểm: ${result.totalPoints}`);
+                if (result.alreadyCalculated) {
+                    alert(`⚠️ Trận đấu đã được tính điểm trước đó!\nKhông tính điểm lại.`);
+                } else {
+                    alert(`✅ Đã nhập kết quả và tính điểm thành công!\n📊 Số dự đoán: ${result.totalPredictions}\n✅ Dự đoán đúng: ${result.totalCorrect}\n💰 Tổng điểm: ${result.totalPoints}`);
+                }
             } else {
                 alert('✅ Đã nhập kết quả thành công! Không có dự đoán mới để tính điểm.');
             }
@@ -411,7 +417,7 @@ async function submitMatchResult() {
             // 6. Reload dữ liệu
             await loadMatches();
             await loadDashboard();
-            await loadPredictions(); // Reload để thấy điểm đã cập nhật
+            await loadPredictions();
             
         } catch (calcError) {
             console.error('❌ Lỗi tính điểm chi tiết:', calcError);
@@ -1294,3 +1300,58 @@ async function manualCalculatePoints() {
     }
 }
 
+// js/admin.js - THÊM HÀM RESET ĐIỂM
+
+async function resetMatchPoints(matchId) {
+    if (!matchId) {
+        matchId = prompt('📝 Nhập ID trận đấu cần reset điểm:');
+        if (!matchId) return;
+    }
+    
+    if (!confirm(`⚠️ Bạn có chắc muốn RESET ĐIỂM cho trận đấu ${matchId}?\nHành động này sẽ xóa tất cả điểm đã tính!`)) {
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Kiểm tra trận đấu
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu!');
+            return;
+        }
+        
+        // Reset trạng thái trận đấu
+        await db.collection('matches').doc(matchId).update({
+            isResultEntered: false,
+            pointsCalculated: false,
+            calculatedAt: null
+        });
+        
+        // Reset các dự đoán
+        const predSnap = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .get();
+        
+        const batch = db.batch();
+        predSnap.forEach(doc => {
+            batch.update(doc.ref, {
+                points: 0,
+                isCorrect: false,
+                isProcessed: false,
+                calculatedAt: null
+            });
+        });
+        await batch.commit();
+        
+        alert('✅ Đã reset điểm cho trận đấu!');
+        await loadMatches();
+        await loadDashboard();
+        await loadPredictions();
+        
+    } catch (error) {
+        console.error('❌ Lỗi reset điểm:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}

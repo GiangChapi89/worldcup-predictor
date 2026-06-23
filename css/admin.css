@@ -308,3 +308,19 @@
     background: #e0a800;
     transform: translateY(-2px);
 }
+/* admin.css - Thêm style cho btn-danger nếu chưa có */
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
