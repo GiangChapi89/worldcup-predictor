@@ -1,6 +1,8 @@
 // js/admin.js
 console.log('🔍 Admin.js loaded');
 
+// Tạo instance global
+let matchManager = null;
 // ============================================
 // DANH SÁCH ADMIN
 // ============================================
@@ -74,6 +76,22 @@ async function checkAdmin() {
     } catch (error) {
         console.error('❌ Lỗi:', error);
         return false;
+    }
+    if (window.matchManager) {
+        await window.matchManager.listenMatches();
+    }
+}
+
+// Khởi tạo MatchManager khi load
+async function initMatchManager() {
+    try {
+        matchManager = new MatchManager();
+        // Load dữ liệu matches
+        await matchManager.listenMatches();
+        window.matchManager = matchManager;
+        console.log('✅ MatchManager initialized');
+    } catch (error) {
+        console.error('❌ Lỗi init MatchManager:', error);
     }
 }
 
@@ -151,6 +169,8 @@ async function loadRecentActivity() {
 // ============================================
 // LOAD MATCHES
 // ============================================
+// js/admin.js - CẬP NHẬT loadMatches
+
 async function loadMatches() {
     const container = document.getElementById('matchListAdmin');
     if (!container) return;
@@ -163,15 +183,20 @@ async function loadMatches() {
             .orderBy('date')
             .get();
         
-        if (snapshot.empty) {
+        // Lưu dữ liệu vào global để các hàm khác sử dụng
+        window.adminMatches = [];
+        snapshot.forEach(doc => {
+            window.adminMatches.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (window.adminMatches.length === 0) {
             container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có trận đấu nào</p>';
             return;
         }
         
         let html = '<div class="match-grid">';
-        snapshot.forEach(doc => {
-            const match = doc.data();
-            const id = doc.id;
+        window.adminMatches.forEach(match => {
+            const id = match.id;
             const isFinished = match.status === 'finished';
             const statusClass = isFinished ? 'finished' : 'upcoming';
             
@@ -521,27 +546,46 @@ async function deleteMatch(matchId) {
 // ============================================
 // QUẢN LÝ KẾT QUẢ
 // ============================================
-function showResultForm(matchId) {
-    const form = document.getElementById('resultForm');
-    const match = window.matchManager?.matches?.find(m => m.id === matchId);
-    
-    if (!match) {
-        alert('❌ Không tìm thấy trận đấu');
-        return;
-    }
+// js/admin.js - SỬA HÀM showResultForm
 
-    document.getElementById('resultMatchId').value = matchId;
-    document.getElementById('resultMatchName').textContent = `${match.homeTeam} vs ${match.awayTeam}`;
-    document.getElementById('resultHomeScore').value = '';
-    document.getElementById('resultAwayScore').value = '';
-    document.getElementById('resultNote').value = '';
-    form.style.display = 'block';
-    form.scrollIntoView({ behavior: 'smooth' });
+async function showResultForm(matchId) {
+    try {
+        const db = firebase.firestore();
+        
+        // Lấy trực tiếp từ Firestore thay vì từ memory
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu!');
+            return;
+        }
+        
+        const match = matchDoc.data();
+        
+        // Hiển thị form
+        document.getElementById('resultMatchId').value = matchId;
+        document.getElementById('resultMatchName').textContent = `${match.homeTeam} vs ${match.awayTeam}`;
+        document.getElementById('resultHomeScore').value = '';
+        document.getElementById('resultAwayScore').value = '';
+        document.getElementById('resultNote').value = '';
+        
+        const form = document.getElementById('resultForm');
+        if (form) {
+            form.style.display = 'block';
+            form.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+    } catch (error) {
+        console.error('❌ Lỗi hiển thị form kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
 }
 
 function cancelResultForm() {
     document.getElementById('resultForm').style.display = 'none';
 }
+
+// js/admin.js - SỬA HÀM submitMatchResult
 
 async function submitMatchResult() {
     const matchId = document.getElementById('resultMatchId').value;
@@ -549,12 +593,17 @@ async function submitMatchResult() {
     const awayScore = document.getElementById('resultAwayScore').value;
     const note = document.getElementById('resultNote').value;
 
+    if (!matchId) {
+        alert('❌ Không tìm thấy ID trận đấu!');
+        return;
+    }
+
     if (!homeScore || !awayScore) {
         alert('⚠️ Vui lòng nhập đầy đủ tỷ số!');
         return;
     }
 
-    if (homeScore < 0 || awayScore < 0) {
+    if (parseInt(homeScore) < 0 || parseInt(awayScore) < 0) {
         alert('⚠️ Tỷ số không được nhỏ hơn 0!');
         return;
     }
@@ -564,38 +613,198 @@ async function submitMatchResult() {
     }
 
     try {
-        // Sử dụng MatchManager để nhập kết quả
-        const matchManager = new MatchManager();
-        const result = await matchManager.enterMatchResult(matchId, parseInt(homeScore), parseInt(awayScore), note);
+        // Kiểm tra trận đấu tồn tại
+        const db = firebase.firestore();
+        const matchDoc = await db.collection('matches').doc(matchId).get();
         
-        if (result.success) {
-            await logAdminAction('enter_result', matchId, { homeScore, awayScore, note });
-            alert('✅ ' + result.message);
-            cancelResultForm();
-            await loadMatches();
-            await loadDashboard();
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu!');
+            return;
         }
+        
+        const match = matchDoc.data();
+        
+        if (match.status === 'finished') {
+            alert('⚠️ Trận đấu đã có kết quả!');
+            return;
+        }
+
+        // Cập nhật kết quả
+        await db.collection('matches').doc(matchId).update({
+            homeScore: parseInt(homeScore),
+            awayScore: parseInt(awayScore),
+            status: 'finished',
+            isResultEntered: false,
+            resultEnteredBy: firebase.auth().currentUser?.uid || 'admin',
+            resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Lưu lịch sử nhập kết quả
+        await db.collection('match_results').add({
+            matchId: matchId,
+            homeScore: parseInt(homeScore),
+            awayScore: parseInt(awayScore),
+            enteredBy: firebase.auth().currentUser?.uid || 'admin',
+            enteredByEmail: firebase.auth().currentUser?.email || 'admin',
+            note: note || `Nhập kết quả ${match.homeTeam} vs ${match.awayTeam}`,
+            enteredAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Log hành động
+        await logAdminAction('enter_result', matchId, { 
+            homeScore, 
+            awayScore, 
+            note,
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam
+        });
+
+        alert('✅ Đã nhập kết quả thành công! Đang tính điểm...');
+
+        // Tính điểm
+        try {
+            const matchManager = new MatchManager();
+            await matchManager.calculatePoints(matchId);
+            alert('✅ Đã tính điểm thành công!');
+        } catch (calcError) {
+            console.warn('⚠️ Lỗi tính điểm:', calcError);
+            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công.');
+        }
+
+        // Đóng form và reload
+        cancelResultForm();
+        await loadMatches();
+        await loadDashboard();
+
     } catch (error) {
         console.error('❌ Lỗi nhập kết quả:', error);
         alert('❌ Lỗi: ' + error.message);
     }
 }
 
+// js/admin.js - SỬA HÀM deleteMatchResult
+
 async function deleteMatchResult(matchId) {
+    if (!matchId) {
+        alert('❌ Không tìm thấy ID trận đấu!');
+        return;
+    }
+
     if (!confirm('⚠️ Bạn có chắc muốn xóa kết quả trận đấu?\nHành động này sẽ reset tất cả dữ liệu và điểm số liên quan!')) {
         return;
     }
 
     try {
-        const matchManager = new MatchManager();
-        const result = await matchManager.deleteMatchResult(matchId);
+        const db = firebase.firestore();
         
-        if (result.success) {
-            await logAdminAction('delete_result', matchId, {});
-            alert('✅ ' + result.message);
-            await loadMatches();
-            await loadDashboard();
+        // Kiểm tra trận đấu tồn tại
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu!');
+            return;
         }
+        
+        const match = matchDoc.data();
+        
+        if (match.status !== 'finished') {
+            alert('⚠️ Trận đấu chưa có kết quả để xóa!');
+            return;
+        }
+
+        // Reset kết quả
+        await db.collection('matches').doc(matchId).update({
+            homeScore: null,
+            awayScore: null,
+            status: 'upcoming',
+            isResultEntered: false,
+            resultEnteredBy: null,
+            resultEnteredAt: null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Reset các dự đoán đã xử lý
+        const predictionsSnap = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .where('isProcessed', '==', true)
+            .get();
+
+        const batch = db.batch();
+        
+        predictionsSnap.forEach(doc => {
+            batch.update(doc.ref, {
+                points: 0,
+                isCorrect: false,
+                isProcessed: false,
+                calculatedAt: null
+            });
+        });
+
+        // Reset điểm cho user
+        const allPredictions = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .get();
+
+        const userPoints = new Map();
+        
+        allPredictions.forEach(doc => {
+            const pred = doc.data();
+            if (!userPoints.has(pred.userId)) {
+                userPoints.set(pred.userId, {
+                    points: pred.points || 0,
+                    isCorrect: pred.isCorrect || false
+                });
+            }
+        });
+
+        const userBatch = db.batch();
+        for (const [userId, data] of userPoints) {
+            const userRef = db.collection('users').doc(userId);
+            if (data.points > 0) {
+                userBatch.update(userRef, {
+                    balance: firebase.firestore.FieldValue.increment(-data.points),
+                    totalPoints: firebase.firestore.FieldValue.increment(-data.points),
+                    correctPredictions: firebase.firestore.FieldValue.increment(data.isCorrect ? -1 : 0)
+                });
+            } else {
+                userBatch.update(userRef, {
+                    balance: firebase.firestore.FieldValue.increment(1)
+                });
+            }
+        }
+
+        // Xóa lịch sử dự đoán
+        const historySnap = await db.collection('user_predictions_history')
+            .where('matchId', '==', matchId)
+            .get();
+
+        historySnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // Xóa lịch sử nhập kết quả
+        const resultSnap = await db.collection('match_results')
+            .where('matchId', '==', matchId)
+            .get();
+
+        resultSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+        await userBatch.commit();
+
+        // Log hành động
+        await logAdminAction('delete_result', matchId, { 
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam
+        });
+
+        alert('✅ Đã xóa kết quả và reset dữ liệu thành công!');
+        
+        await loadMatches();
+        await loadDashboard();
+
     } catch (error) {
         console.error('❌ Lỗi xóa kết quả:', error);
         alert('❌ Lỗi: ' + error.message);
