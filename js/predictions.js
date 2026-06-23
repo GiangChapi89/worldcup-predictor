@@ -101,9 +101,6 @@ async function predictMatch(matchId) {
                     
                     <div style="text-align:center;font-size:1.2rem;font-weight:bold;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:20px;">
                         ${match.homeTeam} vs ${match.awayTeam}
-                        <div style="font-size:0.9rem;font-weight:normal;color:#666;margin-top:5px;">
-                            ⚡ Kèo chấp mặc định: ${match.handicap || 0}
-                        </div>
                     </div>
 
                     <div style="margin-bottom:15px;">
@@ -153,7 +150,7 @@ async function predictMatch(matchId) {
                         <select id="predHandicap" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:8px;font-size:16px;">
                             <!-- Sẽ được cập nhật bằng JavaScript -->
                         </select>
-                        <div style="font-size:12px;color:#888;margin-top:5px;" id="handicapNote">
+                        <div style="font-size:12px;margin-top:5px;" id="handicapNote">
                             ⚠️ Khi chọn "Hòa", chỉ có kèo đồng banh (0)
                         </div>
                     </div>
@@ -218,6 +215,9 @@ function updateHandicapOptions(choice, defaultHandicap) {
         if (note) {
             note.innerHTML = '⚠️ Khi chọn "Hòa", chỉ có kèo đồng banh (0)';
             note.style.color = '#ffc107';
+            note.style.background = '#fff3cd';
+            note.style.padding = '5px 10px';
+            note.style.borderRadius = '5px';
         }
     } else {
         // Khi chọn Germany hoặc France -> hiển thị tất cả kèo
@@ -233,9 +233,13 @@ function updateHandicapOptions(choice, defaultHandicap) {
             { value: 2, label: '2 - Chấp 2 trái' }
         ];
         if (note) {
-            const teamName = choice === 'home' ? 'đội nhà' : 'đội khách';
-            note.innerHTML = `✅ Cho phép chọn kèo chấp cho ${teamName}`;
+            // ❌ XÓA DÒNG CHỮ "Cho phép chọn kèo chấp cho đội khách"
+            // Thay bằng text đơn giản
+            note.innerHTML = '✅ Chọn kèo chấp phù hợp';
             note.style.color = '#28a745';
+            note.style.background = '#d4edda';
+            note.style.padding = '5px 10px';
+            note.style.borderRadius = '5px';
         }
     }
     
