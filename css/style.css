@@ -1037,3 +1037,30 @@ section h2 {
         font-size: 14px;
     }
 }
+/* style.css - Thêm style cho handicap selection */
+
+/* Highlight khi chọn kèo chấp */
+.handicap-selected {
+    border-color: #667eea !important;
+    background: #f0f2ff !important;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Style cho handicap note */
+#handicapNote {
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin-top: 5px;
+    transition: all 0.3s;
+}
+
+#handicapNote.warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+#handicapNote.success {
+    background: #d4edda;
+    color: #155724;
+}
