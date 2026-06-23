@@ -89,6 +89,10 @@ class MatchManager {
     // ============================================
     // TÍNH ĐIỂM DỰA TRÊN KÈO CHẤP VÀ TỶ SỐ
     // ============================================
+    // js/matches.js - CẬP NHẬT HÀM calculatePoints
+
+    // js/matches.js - SỬA HÀM calculatePoints
+
     async calculatePoints(matchId) {
         console.log('🧮 Bắt đầu tính điểm cho trận:', matchId);
         
@@ -471,7 +475,7 @@ class MatchManager {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Reset các dự đoán đã xử lý
+            // Xóa các dự đoán đã xử lý
             const predictionsSnap = await db.collection('predictions')
                 .where('matchId', '==', matchId)
                 .where('isProcessed', '==', true)
@@ -531,15 +535,6 @@ class MatchManager {
                 batch.delete(doc.ref);
             });
 
-            // Xóa lịch sử nhập kết quả
-            const resultSnap = await db.collection('match_results')
-                .where('matchId', '==', matchId)
-                .get();
-
-            resultSnap.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-
             await batch.commit();
             await userBatch.commit();
 
@@ -596,6 +591,7 @@ class MatchManager {
             // Lấy lịch sử nhập kết quả
             const resultSnap = await db.collection('match_results')
                 .where('matchId', '==', matchId)
+                .orderBy('enteredAt', 'desc')
                 .limit(1)
                 .get();
 
@@ -736,5 +732,3 @@ async function viewMatchHistory(matchId) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MatchManager;
 }
-
-console.log('✅ MatchManager loaded successfully');

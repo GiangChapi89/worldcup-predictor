@@ -273,8 +273,11 @@ async function showResultForm(matchId) {
 
 // ============================================
 
-// js/admin.js - SỬA LẠI TOÀN BỘ HÀM submitMatchResult
+// js/admin.js - SỬA HÀM submitMatchResult VÀ THÊM HÀM TÍNH ĐIỂM THỦ CÔNG
 
+// ============================================
+// SUBMIT MATCH RESULT - CẬP NHẬT
+// ============================================
 async function submitMatchResult() {
     console.log('🔍 submitMatchResult called');
     
@@ -386,6 +389,9 @@ async function submitMatchResult() {
             if (typeof MatchManager === 'undefined') {
                 console.error('❌ MatchManager không tồn tại!');
                 alert('⚠️ Lỗi: Không tìm thấy MatchManager. Vui lòng kiểm tra file matches.js');
+                await loadMatches();
+                await loadDashboard();
+                await loadPredictions();
                 return;
             }
             
@@ -410,12 +416,146 @@ async function submitMatchResult() {
         } catch (calcError) {
             console.error('❌ Lỗi tính điểm chi tiết:', calcError);
             alert(`⚠️ Đã nhập kết quả nhưng lỗi tính điểm: ${calcError.message}\nVui lòng thử tính điểm thủ công.`);
+            await loadMatches();
+            await loadDashboard();
+            await loadPredictions();
         }
         
         console.log('✅ Hoàn tất quá trình nhập kết quả');
 
     } catch (error) {
         console.error('❌ Lỗi nhập kết quả:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// TÍNH ĐIỂM THỦ CÔNG - THÊM MỚI
+// ============================================
+async function manualCalculatePoints() {
+    console.log('🧮 Manual calculate points called');
+    
+    const matchId = prompt('📝 Nhập ID trận đấu cần tính điểm:');
+    if (!matchId) {
+        console.log('❌ Không có ID trận đấu');
+        return;
+    }
+    
+    if (!confirm(`⚠️ Bạn có chắc muốn tính điểm cho trận đấu ${matchId}?`)) {
+        return;
+    }
+    
+    try {
+        // Kiểm tra MatchManager
+        if (typeof MatchManager === 'undefined') {
+            alert('❌ Lỗi: MatchManager không tồn tại! Vui lòng kiểm tra file matches.js');
+            return;
+        }
+        
+        const db = firebase.firestore();
+        
+        // Kiểm tra trận đấu tồn tại
+        const matchDoc = await db.collection('matches').doc(matchId).get();
+        
+        if (!matchDoc.exists) {
+            alert('❌ Không tìm thấy trận đấu!');
+            return;
+        }
+        
+        const match = matchDoc.data();
+        
+        if (match.status !== 'finished') {
+            alert('⚠️ Trận đấu chưa kết thúc! Vui lòng nhập kết quả trước.');
+            return;
+        }
+        
+        console.log('📊 Match data:', match);
+        
+        // Lấy tất cả dự đoán cho trận này
+        const predictionsSnap = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .get();
+        
+        if (predictionsSnap.empty) {
+            alert('⚠️ Không có dự đoán nào cho trận này!');
+            return;
+        }
+        
+        console.log(`📝 Tìm thấy ${predictionsSnap.size} dự đoán`);
+        
+        // Tính điểm
+        const matchManager = new MatchManager();
+        const result = await matchManager.calculatePoints(matchId);
+        
+        if (result) {
+            alert(`✅ Tính điểm thành công!\n📊 Số dự đoán: ${result.totalPredictions}\n✅ Dự đoán đúng: ${result.totalCorrect}\n💰 Tổng điểm: ${result.totalPoints}`);
+            await loadPredictions();
+            await loadDashboard();
+            await loadMatches();
+        } else {
+            alert('⚠️ Không có dự đoán nào để tính điểm');
+        }
+        
+    } catch (error) {
+        console.error('❌ Lỗi tính điểm thủ công:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// TÍNH ĐIỂM TẤT CẢ TRẬN ĐÃ KẾT THÚC - THÊM MỚI
+// ============================================
+async function calculateAllMatches() {
+    console.log('🧮 Calculate all matches points called');
+    
+    if (!confirm('⚠️ Bạn có chắc muốn tính điểm cho TẤT CẢ các trận đã kết thúc?')) {
+        return;
+    }
+    
+    try {
+        const db = firebase.firestore();
+        
+        // Lấy tất cả trận đã kết thúc
+        const matchesSnap = await db.collection('matches')
+            .where('status', '==', 'finished')
+            .get();
+        
+        if (matchesSnap.empty) {
+            alert('⚠️ Không có trận đấu nào đã kết thúc!');
+            return;
+        }
+        
+        console.log(`📝 Tìm thấy ${matchesSnap.size} trận đã kết thúc`);
+        
+        let totalMatches = 0;
+        let totalPredictions = 0;
+        let totalCorrect = 0;
+        let totalPoints = 0;
+        
+        const matchManager = new MatchManager();
+        
+        for (const doc of matchesSnap.docs) {
+            const match = doc.data();
+            console.log(`📊 Xử lý trận: ${match.homeTeam} vs ${match.awayTeam}`);
+            
+            const result = await matchManager.calculatePoints(doc.id);
+            
+            if (result) {
+                totalMatches++;
+                totalPredictions += result.totalPredictions;
+                totalCorrect += result.totalCorrect;
+                totalPoints += result.totalPoints;
+            }
+        }
+        
+        alert(`✅ Tính điểm thành công!\n📊 Số trận: ${totalMatches}\n📝 Tổng dự đoán: ${totalPredictions}\n✅ Dự đoán đúng: ${totalCorrect}\n💰 Tổng điểm: ${totalPoints}`);
+        
+        await loadPredictions();
+        await loadDashboard();
+        await loadMatches();
+        
+    } catch (error) {
+        console.error('❌ Lỗi tính điểm tất cả trận:', error);
         alert('❌ Lỗi: ' + error.message);
     }
 }
