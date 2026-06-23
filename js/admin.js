@@ -1333,3 +1333,303 @@ async function resetMatchPoints() {
         alert('❌ Lỗi: ' + error.message);
     }
 }
+// js/admin.js - THÊM HÀM RESET HỆ THỐNG
+
+// ============================================
+// RESET TOÀN BỘ HỆ THỐNG
+// ============================================
+async function resetSystem() {
+    console.log('🔄 Reset system called');
+    
+    // Xác nhận nhiều lần để tránh nhầm lẫn
+    if (!confirm('⚠️ BẠN CÓ CHẮC MUỐN RESET TOÀN BỘ HỆ THỐNG?\n\nHành động này sẽ XÓA TẤT CẢ:\n- Tất cả trận đấu\n- Tất cả dự đoán\n- Tất cả kết quả\n- Tất cả lịch sử\n- Tất cả người dùng\n\nDữ liệu sẽ không thể khôi phục!')) {
+        console.log('❌ Hủy reset hệ thống');
+        return;
+    }
+    
+    if (!confirm('⚠️ LẦN CUỐI: Bạn có chắc chắn muốn xóa toàn bộ dữ liệu?')) {
+        console.log('❌ Hủy reset hệ thống');
+        return;
+    }
+    
+    // Yêu cầu nhập mật khẩu xác nhận
+    const password = prompt('🔐 Nhập mật khẩu xác nhận để reset hệ thống:');
+    if (password !== 'admin123') { // Mật khẩu mặc định
+        alert('❌ Mật khẩu không đúng! Hủy reset.');
+        return;
+    }
+    
+    if (!confirm('⚠️ XÁC NHẬN CUỐI CÙNG: Reset toàn bộ hệ thống?')) {
+        return;
+    }
+
+    try {
+        const db = firebase.firestore();
+        const user = firebase.auth().currentUser;
+        
+        // Kiểm tra quyền admin
+        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
+        if (!adminEmails.includes(user?.email)) {
+            alert('❌ Bạn không có quyền reset hệ thống!');
+            return;
+        }
+
+        // Hiển thị loading
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'resetLoading';
+        loadingDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 24px;
+        `;
+        loadingDiv.innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:48px;margin-bottom:20px;">🔄</div>
+                <div>Đang reset hệ thống...</div>
+                <div id="resetProgress" style="font-size:16px;margin-top:10px;color:#ffd700;">Đang xóa dữ liệu...</div>
+            </div>
+        `;
+        document.body.appendChild(loadingDiv);
+
+        const progress = document.getElementById('resetProgress');
+        
+        // 1. Xóa collection: matches
+        progress.textContent = '📊 Đang xóa trận đấu...';
+        const matchesSnap = await db.collection('matches').get();
+        const batch1 = db.batch();
+        matchesSnap.forEach(doc => batch1.delete(doc.ref));
+        await batch1.commit();
+        console.log('✅ Đã xóa matches');
+
+        // 2. Xóa collection: predictions
+        progress.textContent = '📝 Đang xóa dự đoán...';
+        const predSnap = await db.collection('predictions').get();
+        const batch2 = db.batch();
+        predSnap.forEach(doc => batch2.delete(doc.ref));
+        await batch2.commit();
+        console.log('✅ Đã xóa predictions');
+
+        // 3. Xóa collection: match_results
+        progress.textContent = '📊 Đang xóa kết quả trận đấu...';
+        const resultSnap = await db.collection('match_results').get();
+        const batch3 = db.batch();
+        resultSnap.forEach(doc => batch3.delete(doc.ref));
+        await batch3.commit();
+        console.log('✅ Đã xóa match_results');
+
+        // 4. Xóa collection: user_predictions_history
+        progress.textContent = '📋 Đang xóa lịch sử dự đoán...';
+        const historySnap = await db.collection('user_predictions_history').get();
+        const batch4 = db.batch();
+        historySnap.forEach(doc => batch4.delete(doc.ref));
+        await batch4.commit();
+        console.log('✅ Đã xóa user_predictions_history');
+
+        // 5. Xóa collection: audit_logs
+        progress.textContent = '📋 Đang xóa lịch sử hoạt động...';
+        const logSnap = await db.collection('audit_logs').get();
+        const batch5 = db.batch();
+        logSnap.forEach(doc => batch5.delete(doc.ref));
+        await batch5.commit();
+        console.log('✅ Đã xóa audit_logs');
+
+        // 6. Xóa collection: users (GIỮ LẠI ADMIN HIỆN TẠI)
+        progress.textContent = '👤 Đang xóa người dùng...';
+        const usersSnap = await db.collection('users').get();
+        const batch6 = db.batch();
+        usersSnap.forEach(doc => {
+            // Giữ lại admin hiện tại
+            if (doc.id !== user.uid) {
+                batch6.delete(doc.ref);
+            }
+        });
+        await batch6.commit();
+        console.log('✅ Đã xóa users (giữ lại admin)');
+
+        // 7. Reset dữ liệu của admin hiện tại
+        progress.textContent = '🔄 Đang reset dữ liệu admin...';
+        await db.collection('users').doc(user.uid).set({
+            name: user.displayName || 'Admin',
+            email: user.email,
+            role: 'admin',
+            isActive: true,
+            balance: 0,
+            totalPoints: 0,
+            correctPredictions: 0,
+            totalPredictions: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log('✅ Đã reset dữ liệu admin');
+
+        // 8. Tạo trận đấu mẫu để test
+        progress.textContent = '⚽ Đang tạo trận đấu mẫu...';
+        await db.collection('matches').add({
+            homeTeam: 'Brazil',
+            awayTeam: 'Argentina',
+            date: '2026-06-22',
+            time: '20:00',
+            handicap: 0.25,
+            group: 'Group A',
+            status: 'upcoming',
+            homeScore: null,
+            awayScore: null,
+            isResultEntered: false,
+            pointsCalculated: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await db.collection('matches').add({
+            homeTeam: 'Germany',
+            awayTeam: 'France',
+            date: '2026-06-23',
+            time: '17:00',
+            handicap: 0.5,
+            group: 'Group B',
+            status: 'upcoming',
+            homeScore: null,
+            awayScore: null,
+            isResultEntered: false,
+            pointsCalculated: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await db.collection('matches').add({
+            homeTeam: 'England',
+            awayTeam: 'Spain',
+            date: '2026-06-24',
+            time: '15:00',
+            handicap: 0,
+            group: 'Group C',
+            status: 'upcoming',
+            homeScore: null,
+            awayScore: null,
+            isResultEntered: false,
+            pointsCalculated: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('✅ Đã tạo trận đấu mẫu');
+
+        // 9. Log hành động
+        await db.collection('audit_logs').add({
+            adminId: user.uid,
+            adminName: user.displayName || user.email,
+            adminEmail: user.email,
+            action: 'reset_system',
+            detail: 'Reset toàn bộ hệ thống',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 10. Hoàn thành
+        progress.textContent = '✅ Hoàn tất reset hệ thống!';
+        progress.style.color = '#28a745';
+        
+        setTimeout(() => {
+            loadingDiv.innerHTML = `
+                <div style="text-align:center;">
+                    <div style="font-size:60px;margin-bottom:20px;">✅</div>
+                    <div style="font-size:28px;color:#28a745;">RESET HỆ THỐNG THÀNH CÔNG!</div>
+                    <div style="font-size:16px;margin-top:20px;color:#ffd700;">
+                        Đã xóa tất cả dữ liệu và tạo trận đấu mẫu
+                    </div>
+                    <button onclick="location.reload()" style="margin-top:30px;padding:12px 40px;background:#667eea;color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;">
+                        🔄 Tải lại trang
+                    </button>
+                </div>
+            `;
+        }, 1500);
+
+    } catch (error) {
+        console.error('❌ Lỗi reset hệ thống:', error);
+        const loadingDiv = document.getElementById('resetLoading');
+        if (loadingDiv) {
+            loadingDiv.innerHTML = `
+                <div style="text-align:center;">
+                    <div style="font-size:48px;margin-bottom:20px;">❌</div>
+                    <div style="font-size:24px;color:#dc3545;">LỖI RESET HỆ THỐNG!</div>
+                    <div style="font-size:16px;margin-top:20px;color:#ffd700;">${error.message}</div>
+                    <button onclick="document.getElementById('resetLoading').remove()" style="margin-top:30px;padding:12px 40px;background:#dc3545;color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer;">
+                        Đóng
+                    </button>
+                </div>
+            `;
+        }
+        alert('❌ Lỗi reset hệ thống: ' + error.message);
+    }
+}
+
+// ============================================
+// THÊM NÚT RESET VÀO ADMIN PANEL
+// ============================================
+function addResetSystemButton() {
+    // Tìm hoặc tạo container cho các nút admin
+    let actions = document.querySelector('.admin-actions');
+    
+    // Nếu không có, tạo mới
+    if (!actions) {
+        const container = document.querySelector('.admin-container');
+        if (!container) return;
+        
+        actions = document.createElement('div');
+        actions.className = 'admin-actions';
+        actions.style.cssText = `
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        `;
+        container.prepend(actions);
+    }
+
+    // Thêm nút Reset Hệ Thống
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn-danger';
+    resetBtn.style.cssText = `
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.3s;
+        margin-left: auto;
+    `;
+    resetBtn.innerHTML = '🗑️ Reset Hệ Thống';
+    resetBtn.onclick = resetSystem;
+    resetBtn.onmouseover = function() {
+        this.style.transform = 'scale(1.05)';
+        this.style.boxShadow = '0 4px 15px rgba(220,53,69,0.4)';
+    };
+    resetBtn.onmouseout = function() {
+        this.style.transform = 'scale(1)';
+        this.style.boxShadow = 'none';
+    };
+    
+    actions.appendChild(resetBtn);
+    console.log('✅ Đã thêm nút Reset Hệ Thống');
+}
+
+// Gọi khi trang load
+document.addEventListener('DOMContentLoaded', function() {
+    // ... code hiện có ...
+    addResetSystemButton();
+});
