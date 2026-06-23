@@ -128,11 +128,19 @@ class MatchManager {
 
             if (predictionsSnap.empty) {
                 console.log('📭 Không có dự đoán nào cho trận này');
+                // Đánh dấu đã xử lý để không tính lại
                 await matchDoc.ref.update({
                     isResultEntered: true,
-                    resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp()
+                    resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    pointsCalculated: true,
+                    calculatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                return null;
+                return {
+                    totalPredictions: 0,
+                    totalCorrect: 0,
+                    totalPoints: 0,
+                    alreadyCalculated: false
+                };
             }
 
             console.log(`📝 Tìm thấy ${predictionsSnap.size} dự đoán`);
@@ -141,13 +149,14 @@ class MatchManager {
             let totalCorrect = 0;
             let totalPoints = 0;
             const results = [];
+            let processedCount = 0;
 
             // Duyệt từng dự đoán
             for (const doc of predictionsSnap.docs) {
                 const prediction = doc.data();
                 const userId = prediction.userId;
                 
-                // Chỉ xử lý dự đoán chưa được xử lý
+                // ⚠️ CHỈ XỬ LÝ DỰ ĐOÁN CHƯA XỬ LÝ
                 if (prediction.isProcessed === true) {
                     console.log(`⏭️ Bỏ qua dự đoán đã xử lý của user: ${userId}`);
                     continue;
@@ -159,7 +168,7 @@ class MatchManager {
                 
                 // Tính điểm dựa trên kèo chấp và tỷ số
                 const result = this.calculateMatchResult(match, prediction);
-                console.log(`📊 Kết quả: điểm=${result.points}, đúng=${result.isCorrect}, detail=${result.detail}`);
+                console.log(`📊 Kết quả: điểm=${result.points}, đúng=${result.isCorrect}`);
                 
                 // Cập nhật điểm cho dự đoán
                 const predRef = db.collection('predictions').doc(doc.id);
@@ -184,7 +193,7 @@ class MatchManager {
                     totalCorrect++;
                     totalPoints += result.points;
                 } else {
-                    // Nếu sai, vẫn tăng totalPredictions nhưng không tăng điểm
+                    // Nếu sai, vẫn tăng totalPredictions
                     batch.update(userRef, {
                         totalPredictions: firebase.firestore.FieldValue.increment(1),
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
@@ -221,9 +230,29 @@ class MatchManager {
                     isCorrect: result.isCorrect,
                     detail: result.detail
                 });
+                
+                processedCount++;
             }
 
-            // Đánh dấu trận đấu đã nhập kết quả và tính điểm
+            // Nếu không có dự đoán nào mới để xử lý
+            if (processedCount === 0) {
+                console.log('📭 Không có dự đoán mới để xử lý');
+                await matchDoc.ref.update({
+                    isResultEntered: true,
+                    resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    pointsCalculated: true,
+                    calculatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                return {
+                    totalPredictions: 0,
+                    totalCorrect: 0,
+                    totalPoints: 0,
+                    alreadyCalculated: false,
+                    noNewPredictions: true
+                };
+            }
+
+            // Đánh dấu trận đấu đã tính điểm
             batch.update(matchDoc.ref, {
                 isResultEntered: true,
                 resultEnteredAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -234,7 +263,7 @@ class MatchManager {
             // Commit tất cả cập nhật
             await batch.commit();
             
-            console.log(`✅ Đã tính điểm cho ${predictionsSnap.size} dự đoán`);
+            console.log(`✅ Đã tính điểm cho ${processedCount} dự đoán mới`);
             console.log(`📊 Số dự đoán đúng: ${totalCorrect}`);
             console.log(`💰 Tổng điểm phân phối: ${totalPoints}`);
             
@@ -249,11 +278,12 @@ class MatchManager {
             }
 
             return {
-                totalPredictions: predictionsSnap.size,
+                totalPredictions: processedCount,
                 totalCorrect: totalCorrect,
                 totalPoints: totalPoints,
                 results: results,
-                alreadyCalculated: false
+                alreadyCalculated: false,
+                noNewPredictions: false
             };
 
         } catch (error) {
