@@ -272,9 +272,8 @@ async function showResultForm(matchId) {
 }
 
 // ============================================
-// SUBMIT MATCH RESULT - SỬA LỖI
-// ============================================
-// js/admin.js - SỬA HÀM submitMatchResult
+
+// js/admin.js - CẬP NHẬT HÀM submitMatchResult
 
 async function submitMatchResult() {
     console.log('🔍 submitMatchResult called');
@@ -339,7 +338,9 @@ async function submitMatchResult() {
             return;
         }
 
-        // Cập nhật kết quả
+        console.log('📝 Cập nhật kết quả trận đấu...');
+
+        // 1. Cập nhật kết quả trận đấu
         await db.collection('matches').doc(matchId).update({
             homeScore: homeScoreInt,
             awayScore: awayScoreInt,
@@ -350,7 +351,9 @@ async function submitMatchResult() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Lưu lịch sử nhập kết quả
+        console.log('✅ Đã cập nhật kết quả trận đấu');
+
+        // 2. Lưu lịch sử nhập kết quả
         await db.collection('match_results').add({
             matchId: matchId,
             homeScore: homeScoreInt,
@@ -361,7 +364,9 @@ async function submitMatchResult() {
             enteredAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Log hành động
+        console.log('✅ Đã lưu lịch sử kết quả');
+
+        // 3. Log hành động
         await logAdminAction('enter_result', matchId, { 
             homeScore: homeScoreInt, 
             awayScore: awayScoreInt, 
@@ -370,28 +375,35 @@ async function submitMatchResult() {
             awayTeam: match.awayTeam
         });
 
-        alert('✅ Đã nhập kết quả thành công! Đang tính điểm...');
-
-        // 🔧 TÍNH ĐIỂM - SỬA LỖI
+        // 4. TÍNH ĐIỂM - GỌI TRỰC TIẾP
+        console.log('🧮 Bắt đầu tính điểm...');
+        
         try {
-            // Kiểm tra MatchManager có tồn tại không
+            // Sử dụng MatchManager để tính điểm
             if (typeof MatchManager !== 'undefined') {
                 const matchManager = new MatchManager();
-                await matchManager.calculatePoints(matchId);
-                alert('✅ Đã tính điểm thành công!');
+                const result = await matchManager.calculatePoints(matchId);
+                console.log('✅ Kết quả tính điểm:', result);
+                
+                if (result) {
+                    alert(`✅ Đã nhập kết quả và tính điểm thành công!\nSố dự đoán: ${result.totalPredictions}\nDự đoán đúng: ${result.totalCorrect}\nTổng điểm: ${result.totalPoints}`);
+                } else {
+                    alert('✅ Đã nhập kết quả thành công! Không có dự đoán mới để tính điểm.');
+                }
             } else {
-                console.warn('⚠️ MatchManager không tồn tại, bỏ qua tính điểm tự động');
-                alert('⚠️ Đã nhập kết quả thành công! Vui lòng tính điểm thủ công.');
+                console.error('❌ MatchManager không tồn tại');
+                alert('⚠️ Đã nhập kết quả nhưng không thể tính điểm do lỗi hệ thống.');
             }
         } catch (calcError) {
-            console.warn('⚠️ Lỗi tính điểm:', calcError);
-            alert('⚠️ Đã nhập kết quả nhưng chưa tính điểm được. Vui lòng tính điểm thủ công.');
+            console.error('❌ Lỗi tính điểm:', calcError);
+            alert('⚠️ Đã nhập kết quả nhưng lỗi tính điểm: ' + calcError.message);
         }
 
-        // Đóng form và reload
+        // 5. Đóng form và reload
         cancelResultForm();
         await loadMatches();
         await loadDashboard();
+        await loadPredictions(); // Reload predictions để thấy điểm đã cập nhật
         
         console.log('✅ Hoàn tất quá trình nhập kết quả');
 
@@ -773,6 +785,8 @@ async function loadUsers() {
 // ============================================
 // LOAD PREDICTIONS
 // ============================================
+// js/admin.js - CẬP NHẬT HÀM loadPredictions
+
 async function loadPredictions() {
     const container = document.getElementById('predictionList');
     if (!container) return;
@@ -798,6 +812,7 @@ async function loadPredictions() {
                     <th>Trận</th>
                     <th>Dự đoán</th>
                     <th>Kèo chấp</th>
+                    <th>Kết quả</th>
                     <th>Điểm</th>
                     <th>Trạng thái</th>
                 </tr>
@@ -807,11 +822,20 @@ async function loadPredictions() {
         for (const doc of snapshot.docs) {
             const pred = doc.data();
             let matchName = 'N/A';
+            let matchResult = 'Chưa có';
+            let actualHome = '-';
+            let actualAway = '-';
+            
             try {
                 const matchDoc = await db.collection('matches').doc(pred.matchId).get();
                 if (matchDoc.exists) {
                     const m = matchDoc.data();
                     matchName = `${m.homeTeam} vs ${m.awayTeam}`;
+                    if (m.status === 'finished') {
+                        actualHome = m.homeScore;
+                        actualAway = m.awayScore;
+                        matchResult = `${m.homeScore} - ${m.awayScore}`;
+                    }
                 }
             } catch (e) {}
             
@@ -819,13 +843,16 @@ async function loadPredictions() {
                 (pred.isCorrect ? '✅ Đúng' : '❌ Sai') : 
                 '⏳ Chờ xử lý';
             
+            const pointsColor = pred.points > 0 ? '#28a745' : (pred.isProcessed ? '#dc3545' : '#ffc107');
+            
             html += `
                 <tr>
                     <td>${pred.userName || 'N/A'}</td>
                     <td>${matchName}</td>
                     <td style="text-align:center;font-weight:600;">${pred.homeScore} - ${pred.awayScore}</td>
                     <td>${pred.userHandicap || 0} (${pred.handicapChoice || 'draw'})</td>
-                    <td style="text-align:center;font-weight:bold;color:${pred.points > 0 ? '#28a745' : '#dc3545'};">${pred.points || 0}</td>
+                    <td style="text-align:center;font-weight:600;color:${matchResult !== 'Chưa có' ? '#2d3436' : '#b2bec3'};">${matchResult}</td>
+                    <td style="text-align:center;font-weight:bold;color:${pointsColor};">${pred.points || 0}</td>
                     <td>${statusBadge}</td>
                 </tr>
             `;
@@ -1033,3 +1060,31 @@ if (document.readyState === 'loading') {
 } else {
     checkAdmin();
 }
+
+// js/admin.js - THÊM HÀM TÍNH ĐIỂM THỦ CÔNG
+
+async function manualCalculatePoints() {
+    const matchId = prompt('Nhập ID trận đấu cần tính điểm:');
+    if (!matchId) return;
+    
+    if (!confirm(`Bạn có chắc muốn tính điểm cho trận đấu ${matchId}?`)) return;
+    
+    try {
+        const matchManager = new MatchManager();
+        const result = await matchManager.calculatePoints(matchId);
+        
+        if (result) {
+            alert(`✅ Tính điểm thành công!\nSố dự đoán: ${result.totalPredictions}\nDự đoán đúng: ${result.totalCorrect}\nTổng điểm: ${result.totalPoints}`);
+            await loadPredictions();
+            await loadDashboard();
+        } else {
+            alert('⚠️ Không có dự đoán nào để tính điểm');
+        }
+    } catch (error) {
+        console.error('❌ Lỗi tính điểm:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// Thêm nút tính điểm thủ công trong admin.html
+// <button onclick="manualCalculatePoints()" class="btn-info btn-sm">🧮 Tính điểm thủ công</button>
