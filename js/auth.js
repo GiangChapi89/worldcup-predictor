@@ -12,25 +12,18 @@ class AuthManager {
                 const userRef = db.collection('users').doc(user.uid);
                 const doc = await userRef.get();
                 if (!doc.exists) {
-                    await userRef.set({
-                        name: user.displayName || user.email || 'Người dùng',
-                        email: user.email || '',
-                        role: 'user',
-                        isActive: true,
-                        totalPoints: 0,
-                        correctPredictions: 0,
-                        totalPredictions: 0,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    console.log('✅ Đã tạo user mới:', user.uid);
+                    // Hiển thị form đặt nickname cho user mới
+                    this.showNicknameSetup(user);
                 } else {
-                    await userRef.update({
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    const userData = doc.data();
+                    // Kiểm tra nếu chưa có nickname thì yêu cầu đặt
+                    if (!userData.nickname) {
+                        this.showNicknameSetup(user);
+                    } else {
+                        this.showUserInfo(user, userData);
+                        this.loadUserData(user);
+                    }
                 }
-                this.showUserInfo(user);
-                this.loadUserData(user);
             } else {
                 this.showLoginSection();
             }
@@ -80,7 +73,7 @@ class AuthManager {
             document.getElementById('registerForm').style.display = 'none';
         });
 
-        // Enter key support - CẬP NHẬT với toggle password
+        // Enter key support
         const loginEmail = document.getElementById('loginEmail');
         const loginPassword = document.getElementById('loginPassword');
         const registerName = document.getElementById('registerName');
@@ -123,6 +116,337 @@ class AuthManager {
         });
     }
 
+    // ============================================
+    // HIỂN THỊ FORM ĐẶT NICKNAME
+    // ============================================
+    showNicknameSetup(user) {
+        // Tạo modal đặt nickname
+        const modalHtml = `
+            <div id="nicknameModal" class="modal" style="display:block;">
+                <div class="modal-content" style="max-width: 400px;">
+                    <h2 style="text-align:center;margin-bottom:20px;">👤 Đặt Tên Hiển Thị</h2>
+                    <p style="text-align:center;color:#666;margin-bottom:20px;">
+                        Vui lòng đặt tên hiển thị để tham gia dự đoán
+                    </p>
+                    <div class="form-group">
+                        <label>Tên hiển thị</label>
+                        <input type="text" id="nicknameInput" placeholder="Nhập tên của bạn..." 
+                               style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;">
+                        <small style="color:#888;font-size:12px;margin-top:5px;display:block;">
+                            Tên sẽ hiển thị trên bảng xếp hạng
+                        </small>
+                    </div>
+                    <button onclick="authManager.saveNickname()" 
+                            style="width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px;">
+                        ✅ Xác nhận
+                    </button>
+                    <button onclick="authManager.skipNickname()" 
+                            style="width:100%;padding:10px;margin-top:10px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer;">
+                        ⏭️ Bỏ qua (sẽ dùng email)
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer.firstElementChild);
+
+        // Focus vào input
+        setTimeout(() => {
+            document.getElementById('nicknameInput').focus();
+        }, 100);
+
+        // Enter key để submit
+        document.getElementById('nicknameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.saveNickname();
+            }
+        });
+    }
+
+    // ============================================
+    // LƯU NICKNAME
+    // ============================================
+    async saveNickname() {
+        const nickname = document.getElementById('nicknameInput').value.trim();
+        
+        if (!nickname) {
+            alert('⚠️ Vui lòng nhập tên hiển thị!');
+            document.getElementById('nicknameInput').focus();
+            return;
+        }
+
+        if (nickname.length < 2) {
+            alert('⚠️ Tên hiển thị phải có ít nhất 2 ký tự!');
+            document.getElementById('nicknameInput').focus();
+            return;
+        }
+
+        if (nickname.length > 30) {
+            alert('⚠️ Tên hiển thị không được quá 30 ký tự!');
+            document.getElementById('nicknameInput').focus();
+            return;
+        }
+
+        try {
+            const user = auth.currentUser;
+            if (!user) {
+                alert('❌ Vui lòng đăng nhập lại!');
+                return;
+            }
+
+            // Kiểm tra nickname đã tồn tại chưa
+            const existingUser = await db.collection('users')
+                .where('nickname', '==', nickname)
+                .get();
+
+            if (!existingUser.empty) {
+                // Kiểm tra xem nickname đó có phải của user hiện tại không
+                let isOwnNickname = false;
+                existingUser.forEach(doc => {
+                    if (doc.id === user.uid) {
+                        isOwnNickname = true;
+                    }
+                });
+
+                if (!isOwnNickname) {
+                    alert('⚠️ Tên hiển thị này đã được sử dụng! Vui lòng chọn tên khác.');
+                    document.getElementById('nicknameInput').focus();
+                    return;
+                }
+            }
+
+            // Lưu nickname vào Firestore
+            const userRef = db.collection('users').doc(user.uid);
+            await userRef.set({
+                nickname: nickname,
+                name: nickname,
+                email: user.email || '',
+                role: 'user',
+                isActive: true,
+                totalPoints: 0,
+                correctPredictions: 0,
+                totalPredictions: 0,
+                balance: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            // Đóng modal
+            const modal = document.getElementById('nicknameModal');
+            if (modal) modal.remove();
+
+            // Cập nhật UI
+            this.showUserInfo(user, { nickname: nickname });
+            this.loadUserData(user);
+
+            console.log('✅ Đã lưu nickname:', nickname);
+
+        } catch (error) {
+            console.error('❌ Lỗi lưu nickname:', error);
+            alert('❌ Lỗi: ' + error.message);
+        }
+    }
+
+    // ============================================
+    // BỎ QUA ĐẶT NICKNAME
+    // ============================================
+    async skipNickname() {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        try {
+            const defaultName = user.displayName || user.email || 'Người dùng';
+            
+            const userRef = db.collection('users').doc(user.uid);
+            await userRef.set({
+                nickname: defaultName,
+                name: defaultName,
+                email: user.email || '',
+                role: 'user',
+                isActive: true,
+                totalPoints: 0,
+                correctPredictions: 0,
+                totalPredictions: 0,
+                balance: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            const modal = document.getElementById('nicknameModal');
+            if (modal) modal.remove();
+
+            this.showUserInfo(user, { nickname: defaultName });
+            this.loadUserData(user);
+
+            console.log('✅ Đã bỏ qua đặt nickname, dùng:', defaultName);
+
+        } catch (error) {
+            console.error('❌ Lỗi:', error);
+        }
+    }
+
+    // ============================================
+    // CẬP NHẬT NICKNAME (CHO NGƯỜI DÙNG ĐÃ CÓ)
+    // ============================================
+    async updateNickname(newNickname) {
+        const user = auth.currentUser;
+        if (!user) {
+            alert('❌ Vui lòng đăng nhập!');
+            return;
+        }
+
+        if (!newNickname || newNickname.trim().length < 2) {
+            alert('⚠️ Tên hiển thị phải có ít nhất 2 ký tự!');
+            return;
+        }
+
+        try {
+            const nickname = newNickname.trim();
+
+            // Kiểm tra trùng tên
+            const existingUser = await db.collection('users')
+                .where('nickname', '==', nickname)
+                .get();
+
+            if (!existingUser.empty) {
+                let isOwn = false;
+                existingUser.forEach(doc => {
+                    if (doc.id === user.uid) isOwn = true;
+                });
+                if (!isOwn) {
+                    alert('⚠️ Tên hiển thị này đã được sử dụng!');
+                    return;
+                }
+            }
+
+            const userRef = db.collection('users').doc(user.uid);
+            await userRef.update({
+                nickname: nickname,
+                name: nickname,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Cập nhật UI
+            const userData = (await userRef.get()).data();
+            this.showUserInfo(user, userData);
+            window.currentUserName = nickname;
+
+            alert('✅ Đã cập nhật tên hiển thị thành: ' + nickname);
+
+        } catch (error) {
+            console.error('❌ Lỗi cập nhật nickname:', error);
+            alert('❌ Lỗi: ' + error.message);
+        }
+    }
+
+    // ============================================
+    // HIỂN THỊ THÔNG TIN USER
+    // ============================================
+    showUserInfo(user, userData) {
+        const userInfo = document.getElementById('userInfo');
+        const loginSection = document.getElementById('loginSection');
+        
+        // Lấy nickname từ userData hoặc dùng displayName/email
+        const displayName = userData?.nickname || userData?.name || user.displayName || user.email || 'User';
+        
+        userInfo.style.display = 'flex';
+        loginSection.style.display = 'none';
+        
+        document.getElementById('displayName').textContent = displayName;
+        document.getElementById('userName').textContent = displayName;
+        document.getElementById('welcomeMessage').style.display = 'block';
+        
+        // Thêm nút đổi tên
+        this.addChangeNameButton();
+
+        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
+        if (adminEmails.includes(user.email)) {
+            document.getElementById('adminLink').style.display = 'inline-block';
+        }
+        
+        this.enablePrediction(true);
+    }
+
+    // ============================================
+    // THÊM NÚT ĐỔI TÊN
+    // ============================================
+    addChangeNameButton() {
+        const userInfo = document.getElementById('userInfo');
+        let changeBtn = document.getElementById('changeNameBtn');
+        
+        if (!changeBtn) {
+            changeBtn = document.createElement('button');
+            changeBtn.id = 'changeNameBtn';
+            changeBtn.className = 'btn-change-name';
+            changeBtn.innerHTML = '✏️ Đổi tên';
+            changeBtn.onclick = () => this.showChangeNameModal();
+            userInfo.appendChild(changeBtn);
+        }
+    }
+
+    // ============================================
+    // HIỂN THỊ MODAL ĐỔI TÊN
+    // ============================================
+    showChangeNameModal() {
+        const modalHtml = `
+            <div id="changeNameModal" class="modal" style="display:block;">
+                <div class="modal-content" style="max-width: 400px;">
+                    <span class="close" onclick="document.getElementById('changeNameModal').remove()">&times;</span>
+                    <h2 style="text-align:center;margin-bottom:20px;">✏️ Đổi Tên Hiển Thị</h2>
+                    <div class="form-group">
+                        <label>Tên hiển thị mới</label>
+                        <input type="text" id="newNicknameInput" placeholder="Nhập tên mới..." 
+                               style="width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;">
+                        <small style="color:#888;font-size:12px;margin-top:5px;display:block;">
+                            Tên sẽ hiển thị trên bảng xếp hạng
+                        </small>
+                    </div>
+                    <button onclick="authManager.confirmChangeName()" 
+                            style="width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px;">
+                        ✅ Cập nhật
+                    </button>
+                    <button onclick="document.getElementById('changeNameModal').remove()" 
+                            style="width:100%;padding:10px;margin-top:10px;background:#f0f0f0;color:#666;border:none;border-radius:8px;font-size:14px;cursor:pointer;">
+                        ❌ Hủy
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer.firstElementChild);
+
+        setTimeout(() => {
+            document.getElementById('newNicknameInput').focus();
+        }, 100);
+
+        document.getElementById('newNicknameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.confirmChangeName();
+            }
+        });
+    }
+
+    // ============================================
+    // XÁC NHẬN ĐỔI TÊN
+    // ============================================
+    async confirmChangeName() {
+        const newName = document.getElementById('newNicknameInput').value.trim();
+        if (!newName) {
+            alert('⚠️ Vui lòng nhập tên mới!');
+            return;
+        }
+        await this.updateNickname(newName);
+        const modal = document.getElementById('changeNameModal');
+        if (modal) modal.remove();
+    }
+
+    // ============================================
+    // CÁC HÀM KHÁC GIỮ NGUYÊN
+    // ============================================
     resetForms() {
         document.getElementById('emailLoginForm').style.display = 'none';
         document.getElementById('registerForm').style.display = 'none';
@@ -132,7 +456,6 @@ class AuthManager {
         document.getElementById('registerEmail').value = '';
         document.getElementById('registerPassword').value = '';
         
-        // Reset password visibility
         const passwordInputs = document.querySelectorAll('.password-wrapper input[type="password"]');
         passwordInputs.forEach(input => {
             const wrapper = input.closest('.password-wrapper');
@@ -231,26 +554,6 @@ class AuthManager {
         }
     }
 
-    showUserInfo(user) {
-        const userInfo = document.getElementById('userInfo');
-        const loginSection = document.getElementById('loginSection');
-        const displayName = user.displayName || user.email || 'User';
-        
-        userInfo.style.display = 'flex';
-        loginSection.style.display = 'none';
-        
-        document.getElementById('displayName').textContent = displayName;
-        document.getElementById('userName').textContent = displayName;
-        document.getElementById('welcomeMessage').style.display = 'block';
-        
-        const adminEmails = ['admin@gmail.com', 'your-email@gmail.com', 'songdaytronglong@gmail.com'];
-        if (adminEmails.includes(user.email)) {
-            document.getElementById('adminLink').style.display = 'inline-block';
-        }
-        
-        this.enablePrediction(true);
-    }
-
     showLoginSection() {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
@@ -294,7 +597,7 @@ class AuthManager {
             if (doc.exists) {
                 const data = doc.data();
                 window.currentUserId = user.uid;
-                window.currentUserName = data.name || user.displayName || user.email || 'User';
+                window.currentUserName = data.nickname || data.name || user.displayName || user.email || 'User';
             }
         } catch (error) {
             console.error('❌ Lỗi tải dữ liệu user:', error);
