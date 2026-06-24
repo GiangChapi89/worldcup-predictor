@@ -114,16 +114,23 @@ async function loadRecentActivity() {
 // HÀM LOAD MATCHES
 // ============================================
 async function loadMatches() {
+    console.log('⚽ loadMatches called');
     const container = document.getElementById('matchListAdmin');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ matchListAdmin not found');
+        return;
+    }
     
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
         const db = firebase.firestore();
+        console.log('📡 Fetching matches from Firestore...');
         const snapshot = await db.collection('matches')
             .orderBy('date')
             .get();
+        
+        console.log('📦 Matches found:', snapshot.size);
         
         if (snapshot.empty) {
             container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có trận đấu nào</p>';
@@ -171,9 +178,10 @@ async function loadMatches() {
         });
         html += '</div>';
         container.innerHTML = html;
+        console.log('✅ Matches rendered successfully');
         
     } catch (error) {
-        console.error('Lỗi load matches:', error);
+        console.error('❌ Lỗi load matches:', error);
         container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
     }
 }
@@ -182,16 +190,23 @@ async function loadMatches() {
 // HÀM LOAD USERS
 // ============================================
 async function loadUsers() {
+    console.log('👥 loadUsers called');
     const container = document.getElementById('userList');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ userList not found');
+        return;
+    }
     
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
         const db = firebase.firestore();
+        console.log('📡 Fetching users from Firestore...');
         const snapshot = await db.collection('users')
             .orderBy('totalPoints', 'desc')
             .get();
+        
+        console.log('👥 Users found:', snapshot.size);
         
         if (snapshot.empty) {
             container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có người dùng nào</p>';
@@ -298,9 +313,10 @@ async function loadUsers() {
         `;
         
         container.innerHTML = html;
+        console.log('✅ Users rendered successfully');
         
     } catch (error) {
-        console.error('Lỗi load users:', error);
+        console.error('❌ Lỗi load users:', error);
         container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
     }
 }
@@ -309,17 +325,24 @@ async function loadUsers() {
 // HÀM LOAD PREDICTIONS
 // ============================================
 async function loadPredictions() {
+    console.log('📝 loadPredictions called');
     const container = document.getElementById('predictionList');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ predictionList not found');
+        return;
+    }
     
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
         const db = firebase.firestore();
+        console.log('📡 Fetching predictions from Firestore...');
         const snapshot = await db.collection('predictions')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .get();
+        
+        console.log('📝 Predictions found:', snapshot.size);
         
         if (snapshot.empty) {
             container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có dự đoán nào</p>';
@@ -375,9 +398,10 @@ async function loadPredictions() {
         
         html += '</tbody></table></div>';
         container.innerHTML = html;
+        console.log('✅ Predictions rendered successfully');
         
     } catch (error) {
-        console.error('Lỗi load predictions:', error);
+        console.error('❌ Lỗi load predictions:', error);
         container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
     }
 }
@@ -386,16 +410,23 @@ async function loadPredictions() {
 // HÀM LOAD LOGS
 // ============================================
 async function loadLogs() {
+    console.log('📋 loadLogs called');
     const container = document.getElementById('logList');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ logList not found');
+        return;
+    }
     
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
     
     try {
         const db = firebase.firestore();
+        console.log('📡 Fetching logs from Firestore...');
         const snapshot = await db.collection('audit_logs')
             .limit(20)
             .get();
+        
+        console.log('📋 Logs found:', snapshot.size);
         
         if (snapshot.empty) {
             container.innerHTML = `
@@ -459,6 +490,7 @@ async function loadLogs() {
         
         html += '</tbody></table></div>';
         container.innerHTML = html;
+        console.log('✅ Logs rendered successfully');
         
     } catch (error) {
         console.warn('⚠️ Lỗi load logs:', error.message);
@@ -1357,9 +1389,77 @@ window.exportUsers = exportUsers;
 window.checkAdmin = checkAdmin;
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 DOM ready, checking admin...');
-    setTimeout(checkAdmin, 500);
+    console.log('📄 DOM ready, setting up tabs...');
+    
+    // Lấy tất cả tab buttons
+    const tabs = document.querySelectorAll('.tab-btn');
+    console.log('📑 Found tabs:', tabs.length);
+    
+    tabs.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Lấy tab ID
+            const tabId = this.dataset.tab;
+            console.log('🔄 Switching to tab:', tabId);
+            
+            // Remove active từ tất cả tabs
+            tabs.forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Add active cho tab được click
+            this.classList.add('active');
+            const content = document.getElementById(tabId);
+            if (content) {
+                content.classList.add('active');
+                console.log('✅ Tab content shown:', tabId);
+            } else {
+                console.error('❌ Tab content not found:', tabId);
+            }
+            
+            // Load dữ liệu tương ứng
+            try {
+                switch(tabId) {
+                    case 'dashboard':
+                        console.log('📊 Loading dashboard...');
+                        loadDashboard();
+                        break;
+                    case 'matches':
+                        console.log('⚽ Loading matches...');
+                        loadMatches();
+                        break;
+                    case 'users':
+                        console.log('👥 Loading users...');
+                        loadUsers();
+                        break;
+                    case 'predictions':
+                        console.log('📝 Loading predictions...');
+                        loadPredictions();
+                        break;
+                    case 'logs':
+                        console.log('📋 Loading logs...');
+                        loadLogs();
+                        break;
+                    default:
+                        console.log('ℹ️ No data to load for tab:', tabId);
+                }
+            } catch (error) {
+                console.error('❌ Error loading tab data:', error);
+                // Hiển thị thông báo lỗi trên tab
+                const content = document.getElementById(tabId);
+                if (content) {
+                    content.innerHTML = `<p style="color:red;text-align:center;padding:20px;">❌ Lỗi tải dữ liệu: ${error.message}</p>`;
+                }
+            }
+        });
+    });
+    
+    // Mặc định load dashboard
+    setTimeout(() => {
+        console.log('📊 Loading initial dashboard...');
+        loadDashboard();
+    }, 500);
 });
+
+// ============================================
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     console.log('📄 DOM already ready, checking admin...');
