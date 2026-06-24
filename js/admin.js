@@ -1705,6 +1705,14 @@ async function approveAdmin(userId) {
 
         alert(`✅ Đã cấp quyền ADMIN cho ${userData.name || userData.email}!`);
         
+        // 🔧 THÊM: Cập nhật quyền admin cho user đang online
+        const currentUser = firebase.auth().currentUser;
+        if (currentUser && currentUser.uid === userId) {
+            // Nếu user đang được cấp quyền là chính mình
+            document.getElementById('adminLink').style.display = 'inline-block';
+            console.log('👑 Đã cập nhật nút admin cho user hiện tại');
+        }
+        
         // Reload danh sách user
         await loadUsers();
 
@@ -1769,6 +1777,12 @@ async function revokeAdmin(userId) {
         });
 
         alert(`✅ Đã thu hồi quyền ADMIN của ${userData.name || userData.email}!`);
+        
+        // 🔧 THÊM: Ẩn nút admin nếu user đang online bị thu hồi quyền
+        if (currentUser && currentUser.uid === userId) {
+            document.getElementById('adminLink').style.display = 'none';
+            console.log('👤 Đã ẩn nút admin cho user hiện tại');
+        }
         
         // Reload danh sách user
         await loadUsers();
@@ -2018,3 +2032,4 @@ document.addEventListener('DOMContentLoaded', function() {
     // ... code hiện có ...
     addAdminTableStyles();
 });
+

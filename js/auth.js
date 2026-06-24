@@ -20,12 +20,21 @@ class AuthManager {
                     if (!userData.nickname) {
                         this.showNicknameSetup(user);
                     } else {
-                        this.showUserInfo(user, userData);
+                        // 🔧 GỌI showUserInfo VỚI userData
+                        await this.showUserInfo(user, userData);
                         this.loadUserData(user);
+
+                        // 🔥 THÊM: Lắng nghe thay đổi quyền admin real-time
+                        this.listenAdminStatus(user.uid);
                     }
                 }
             } else {
                 this.showLoginSection();
+                // Hủy lắng nghe khi logout
+                if (this.adminUnsubscribe) {
+                    this.adminUnsubscribe();
+                    this.adminUnsubscribe = null;
+                }
             }
         });
 
@@ -344,7 +353,7 @@ class AuthManager {
     // ============================================
     // HIỂN THỊ THÔNG TIN USER
     // ============================================
-    showUserInfo(user, userData) {
+    async showUserInfo(user, userData) {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
         
@@ -361,9 +370,30 @@ class AuthManager {
         // Thêm nút đổi tên
         this.addChangeNameButton();
 
-        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
-        if (adminEmails.includes(user.email)) {
-            document.getElementById('adminLink').style.display = 'inline-block';
+        // 🔧 KIỂM TRA QUYỀN ADMIN TỪ FIRESTORE
+        try {
+            const userRef = db.collection('users').doc(user.uid);
+            const doc = await userRef.get();
+            if (doc.exists) {
+                const data = doc.data();
+                // Kiểm tra role hoặc isAdmin trong Firestore
+                const isAdmin = data.role === 'admin' || data.isAdmin === true;
+                
+                if (isAdmin) {
+                    console.log('👑 User có quyền admin, hiển thị nút Admin');
+                    document.getElementById('adminLink').style.display = 'inline-block';
+                } else {
+                    console.log('👤 User không có quyền admin, ẩn nút Admin');
+                    document.getElementById('adminLink').style.display = 'none';
+                }
+            } else {
+                // Nếu chưa có document user, ẩn nút admin
+                document.getElementById('adminLink').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('❌ Lỗi kiểm tra quyền admin:', error);
+            // Mặc định ẩn nút admin nếu có lỗi
+            document.getElementById('adminLink').style.display = 'none';
         }
         
         this.enablePrediction(true);
@@ -561,6 +591,8 @@ class AuthManager {
         userInfo.style.display = 'none';
         loginSection.style.display = 'block';
         document.getElementById('welcomeMessage').style.display = 'none';
+        
+        // Ẩn nút admin khi chưa đăng nhập
         document.getElementById('adminLink').style.display = 'none';
         
         this.enablePrediction(false);
@@ -614,7 +646,38 @@ class AuthManager {
             console.error('❌ Lỗi đăng xuất:', error);
         }
     }
-}
+
+    // ============================================
+    // KIỂM TRA QUYỀN ADMIN REAL-TIME
+    // ============================================
+    function listenAdminStatus(userId) {
+        if (!userId) return;
+        
+        // Lắng nghe thay đổi của user document
+        db.collection('users').doc(userId)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const isAdmin = data.role === 'admin' || data.isAdmin === true;
+                    const adminLink = document.getElementById('adminLink');
+                    
+                    if (isAdmin) {
+                        adminLink.style.display = 'inline-block';
+                        console.log('👑 Quyền admin đã được cập nhật (real-time)');
+                    } else {
+                        adminLink.style.display = 'none';
+                        console.log('👤 Quyền admin đã bị thu hồi (real-time)');
+                    }
+                }
+            }, (error) => {
+                console.error('❌ Lỗi lắng nghe quyền admin:', error);
+            });
+    }
+
+    // Gọi trong onAuthStateChanged sau khi user đăng nhập
+    // Thêm vào cuối hàm xử lý khi user đã đăng nhập:
+    // this.listenAdminStatus(user.uid);
+    }
 
 // Khởi tạo Auth Manager
 const authManager = new AuthManager();
