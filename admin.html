@@ -760,11 +760,22 @@
         <!-- ============================================ -->
         <!-- QUẢN LÝ NGƯỜI DÙNG -->
         <!-- ============================================ -->
+        <!-- Cập nhật tab Quản Lý Người Dùng -->
         <div id="users" class="tab-content">
             <div class="admin-actions">
                 <button onclick="loadUsers()" class="btn-secondary">🔄 Tải lại</button>
                 <button onclick="exportUsers()" class="btn-info">📥 Export CSV</button>
             </div>
+            
+            <!-- Thêm thông báo quyền -->
+            <div style="margin-bottom:20px;padding:12px 20px;background:#e8f4fd;border-radius:8px;border-left:4px solid #17a2b8;">
+                <span style="font-size:14px;color:#0c5460;">
+                    ℹ️ <strong>Hướng dẫn:</strong> 
+                    Super Admin có thể <strong>phê duyệt</strong> hoặc <strong>thu hồi</strong> quyền admin của người dùng.
+                    Chỉ Super Admin mới có quyền này.
+                </span>
+            </div>
+            
             <div id="userList">
                 <div class="loading">⏳ Đang tải danh sách người dùng...</div>
             </div>

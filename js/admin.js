@@ -1654,3 +1654,367 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(addResetSystemButton, 500);
     }
 });
+// js/admin.js - THÊM CÁC HÀM MỚI
+
+// ============================================
+// PHÊ DUYỆT ADMIN - CẤP QUYỀN ADMIN CHO USER
+// ============================================
+async function approveAdmin(userId) {
+    if (!userId) {
+        alert('❌ Không tìm thấy ID người dùng!');
+        return;
+    }
+
+    if (!confirm('⚠️ Bạn có chắc muốn cấp quyền ADMIN cho người dùng này?\n\nHọ sẽ có toàn quyền quản trị hệ thống!')) {
+        return;
+    }
+
+    try {
+        const db = firebase.firestore();
+        const userRef = db.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            alert('❌ Không tìm thấy người dùng!');
+            return;
+        }
+
+        const userData = userDoc.data();
+        
+        // Kiểm tra nếu đã là admin
+        if (userData.role === 'admin') {
+            alert('⚠️ Người dùng này đã có quyền admin!');
+            return;
+        }
+
+        // Cập nhật role thành admin
+        await userRef.update({
+            role: 'admin',
+            isAdmin: true,
+            approvedBy: firebase.auth().currentUser?.uid || 'admin',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Log hành động
+        await logAdminAction('approve_admin', userId, {
+            userName: userData.name || userData.email,
+            userEmail: userData.email,
+            approvedBy: firebase.auth().currentUser?.email || 'admin'
+        });
+
+        alert(`✅ Đã cấp quyền ADMIN cho ${userData.name || userData.email}!`);
+        
+        // Reload danh sách user
+        await loadUsers();
+
+    } catch (error) {
+        console.error('❌ Lỗi phê duyệt admin:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// THU HỒI QUYỀN ADMIN
+// ============================================
+async function revokeAdmin(userId) {
+    if (!userId) {
+        alert('❌ Không tìm thấy ID người dùng!');
+        return;
+    }
+
+    if (!confirm('⚠️ Bạn có chắc muốn THU HỒI quyền ADMIN của người dùng này?\n\nHọ sẽ mất toàn quyền quản trị!')) {
+        return;
+    }
+
+    try {
+        const db = firebase.firestore();
+        const userRef = db.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            alert('❌ Không tìm thấy người dùng!');
+            return;
+        }
+
+        const userData = userDoc.data();
+        
+        // Không cho thu hồi quyền của chính mình
+        const currentUser = firebase.auth().currentUser;
+        if (userId === currentUser?.uid) {
+            alert('❌ Bạn không thể thu hồi quyền admin của chính mình!');
+            return;
+        }
+
+        // Kiểm tra nếu chưa phải admin
+        if (userData.role !== 'admin') {
+            alert('⚠️ Người dùng này không có quyền admin!');
+            return;
+        }
+
+        // Cập nhật role thành user
+        await userRef.update({
+            role: 'user',
+            isAdmin: false,
+            revokedBy: currentUser?.uid || 'admin',
+            revokedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Log hành động
+        await logAdminAction('revoke_admin', userId, {
+            userName: userData.name || userData.email,
+            userEmail: userData.email,
+            revokedBy: currentUser?.email || 'admin'
+        });
+
+        alert(`✅ Đã thu hồi quyền ADMIN của ${userData.name || userData.email}!`);
+        
+        // Reload danh sách user
+        await loadUsers();
+
+    } catch (error) {
+        console.error('❌ Lỗi thu hồi quyền admin:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// HIỂN THỊ DANH SÁCH USER - CẬP NHẬT CÓ NÚT PHÊ DUYỆT
+// ============================================
+async function loadUsers() {
+    const container = document.getElementById('userList');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
+    
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection('users')
+            .orderBy('totalPoints', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có người dùng nào</p>';
+            return;
+        }
+        
+        const currentUser = firebase.auth().currentUser;
+        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
+        const isSuperAdmin = adminEmails.includes(currentUser?.email);
+
+        let html = `
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+                    <thead>
+                        <tr style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;">
+                            <th style="padding:12px 16px;text-align:left;">#</th>
+                            <th style="padding:12px 16px;text-align:left;">Tên</th>
+                            <th style="padding:12px 16px;text-align:left;">Email</th>
+                            <th style="padding:12px 16px;text-align:center;">Vai trò</th>
+                            <th style="padding:12px 16px;text-align:center;">Điểm</th>
+                            <th style="padding:12px 16px;text-align:center;">Trạng thái</th>
+                            <th style="padding:12px 16px;text-align:center;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        let index = 1;
+        for (const doc of snapshot.docs) {
+            const user = doc.data();
+            const userId = doc.id;
+            const isAdmin = user.role === 'admin' || user.isAdmin === true;
+            const isCurrentUser = userId === currentUser?.uid;
+            const isSuperAdminUser = adminEmails.includes(user.email);
+            
+            // Xác định trạng thái
+            const statusBadge = user.isActive !== false 
+                ? '<span class="badge badge-active">✅ Active</span>' 
+                : '<span class="badge badge-locked">🔒 Locked</span>';
+            
+            // Xác định vai trò
+            let roleBadge = '';
+            if (isAdmin) {
+                roleBadge = '<span class="badge badge-admin">👑 Admin</span>';
+            } else {
+                roleBadge = '<span class="badge badge-user">👤 User</span>';
+            }
+            
+            // Nút thao tác
+            let actionButtons = '';
+            
+            // Chỉ hiển thị nút cho super admin (không phải user thường)
+            if (isSuperAdmin && !isSuperAdminUser) {
+                if (isAdmin) {
+                    // Nếu đã là admin -> hiển thị nút thu hồi
+                    actionButtons = `
+                        <button onclick="revokeAdmin('${userId}')" class="btn-warning btn-sm" style="background:#ffc107;color:#333;">
+                            🔄 Thu hồi
+                        </button>
+                    `;
+                } else {
+                    // Nếu chưa là admin -> hiển thị nút phê duyệt
+                    actionButtons = `
+                        <button onclick="approveAdmin('${userId}')" class="btn-success btn-sm">
+                            ✅ Phê duyệt
+                        </button>
+                    `;
+                }
+            } else if (isSuperAdmin && isSuperAdminUser) {
+                actionButtons = '<span style="color:#888;font-size:12px;">👑 Super Admin</span>';
+            } else if (isCurrentUser) {
+                actionButtons = '<span style="color:#888;font-size:12px;">👤 Bạn</span>';
+            } else {
+                actionButtons = '<span style="color:#888;font-size:12px;">-</span>';
+            }
+            
+            html += `
+                <tr style="border-bottom:1px solid #f0f0f0;${isCurrentUser ? 'background:#f0f2ff;' : ''}">
+                    <td style="padding:10px 16px;text-align:center;">${index}</td>
+                    <td style="padding:10px 16px;font-weight:600;">${user.name || user.nickname || 'N/A'}</td>
+                    <td style="padding:10px 16px;color:#666;">${user.email || 'N/A'}</td>
+                    <td style="padding:10px 16px;text-align:center;">${roleBadge}</td>
+                    <td style="padding:10px 16px;text-align:center;font-weight:bold;color:#667eea;">${user.totalPoints || 0}</td>
+                    <td style="padding:10px 16px;text-align:center;">${statusBadge}</td>
+                    <td style="padding:10px 16px;text-align:center;">${actionButtons}</td>
+                </tr>
+            `;
+            index++;
+        }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // Thêm thông tin tổng quan
+        const totalUsers = snapshot.size;
+        const adminCount = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.role === 'admin' || data.isAdmin === true;
+        }).length;
+        
+        html += `
+            <div style="margin-top:20px;padding:15px 20px;background:white;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.08);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div>
+                    <strong>👥 Tổng số người dùng:</strong> ${totalUsers}
+                </div>
+                <div>
+                    <strong>👑 Số admin:</strong> ${adminCount}
+                </div>
+                <div>
+                    <strong>👤 Số user thường:</strong> ${totalUsers - adminCount}
+                </div>
+                ${isSuperAdmin ? `
+                    <div style="color:#28a745;">
+                        ✅ Bạn có quyền phê duyệt admin
+                    </div>
+                ` : `
+                    <div style="color:#888;">
+                        ℹ️ Chỉ Super Admin mới có quyền phê duyệt
+                    </div>
+                `}
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Lỗi load users:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
+}
+
+// ============================================
+// THÊM CSS CHO ADMIN TABLE
+// ============================================
+function addAdminTableStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        
+        .btn-warning:hover {
+            background: #e0a800;
+            transform: translateY(-2px);
+        }
+        
+        .badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-admin {
+            background: #ffd700;
+            color: #333;
+        }
+        
+        .badge-user {
+            background: #e0e0e0;
+            color: #666;
+        }
+        
+        .badge-active {
+            background: #28a745;
+            color: white;
+        }
+        
+        .badge-locked {
+            background: #dc3545;
+            color: white;
+        }
+        
+        #userList table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        #userList th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        #userList td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        #userList tr:hover td {
+            background: #f8f9fa;
+        }
+        
+        @media (max-width: 768px) {
+            #userList table {
+                font-size: 13px;
+            }
+            
+            #userList th,
+            #userList td {
+                padding: 8px 10px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Gọi khi load trang
+document.addEventListener('DOMContentLoaded', function() {
+    // ... code hiện có ...
+    addAdminTableStyles();
+});
