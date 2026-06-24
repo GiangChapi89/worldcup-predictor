@@ -145,13 +145,13 @@
         }
 
         /* ============================================
-           HƯỚNG DẪN TÍNH ĐIỂM
+           HƯỚNG DẪN TÍNH ĐIỂM - DƯỚI CÙNG
            ============================================ */
         .scoring-guide {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border-radius: 12px;
             padding: 30px;
-            margin: 30px 0;
+            margin: 40px 0 20px 0;
             border-left: 5px solid #667eea;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
@@ -251,6 +251,50 @@
             font-size: 1.3rem;
         }
 
+        /* Bảng tóm tắt trong guide */
+        .scoring-guide .summary-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-top: 15px;
+        }
+
+        .scoring-guide .summary-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .scoring-guide .summary-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .scoring-guide .summary-table td {
+            padding: 10px 16px;
+            text-align: center;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .scoring-guide .summary-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .scoring-guide .summary-table .row-correct {
+            background: #d4edda;
+        }
+
+        .scoring-guide .summary-table .row-half {
+            background: #fff8e1;
+        }
+
+        .scoring-guide .summary-table .row-wrong {
+            background: #f8d7da;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .scoring-guide .guide-grid {
@@ -289,6 +333,15 @@
             .group-section .match-grid {
                 padding: 10px;
             }
+
+            .scoring-guide .summary-table {
+                font-size: 13px;
+            }
+
+            .scoring-guide .summary-table th,
+            .scoring-guide .summary-table td {
+                padding: 8px 10px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -318,6 +371,15 @@
                 font-size: 0.95rem;
                 padding: 12px 15px;
             }
+
+            .scoring-guide .summary-table {
+                font-size: 11px;
+            }
+
+            .scoring-guide .summary-table th,
+            .scoring-guide .summary-table td {
+                padding: 6px 8px;
+            }
         }
     </style>
 </head>
@@ -332,7 +394,6 @@
                 <ul>
                     <li><a href="#matches">🏆 Trận Đấu</a></li>
                     <li><a href="#statistics">📊 Bảng Xếp Hạng</a></li>
-                    <li><a href="#scoringGuide">📖 Hướng dẫn</a></li>
                     <li><a href="history.html" id="historyLink" style="display:none;">📋 Lịch sử</a></li>
                     <li><a href="admin.html" id="adminLink" style="display:none;">⚙️ Admin</a></li>
                 </ul>
@@ -352,6 +413,7 @@
 
     <!-- Main Content -->
     <main class="container">
+        <!-- Welcome Message -->
         <div id="welcomeMessage" style="display: none;">
             <div class="welcome-card">
                 <h2>👋 Chào mừng, <span id="displayName"></span>!</h2>
@@ -360,7 +422,28 @@
         </div>
 
         <!-- ============================================ -->
-        <!-- HƯỚNG DẪN TÍNH ĐIỂM -->
+        <!-- LỊCH THI ĐẤU - PHẦN 1 -->
+        <!-- ============================================ -->
+        <section id="matches">
+            <h2>📅 Lịch Thi Đấu</h2>
+            <div id="matchList" class="match-grid">
+                <p style="text-align: center; padding: 20px;">Đang tải dữ liệu...</p>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- BẢNG XẾP HẠNG - PHẦN 2 -->
+        <!-- ============================================ -->
+        <section id="statistics">
+            <h2>🏆 Bảng Xếp Hạng</h2>
+            <div id="rankingTable">
+                <p style="text-align: center; padding: 20px;">Đang tải bảng xếp hạng...</p>
+            </div>
+            <div id="dailyStats"></div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- HƯỚNG DẪN TÍNH ĐIỂM - PHẦN 3 (DƯỚI CÙNG) -->
         <!-- ============================================ -->
         <section id="scoringGuide" class="scoring-guide">
             <h2>📖 Hướng Dẫn Tính Điểm</h2>
@@ -409,9 +492,9 @@
                     <h4>⚡ Kèo Chấp Trái</h4>
                     <p><strong>Kèo chấp trái</strong> là tỷ lệ chấp giữa hai đội. Bạn có 3 lựa chọn:</p>
                     <ul style="margin: 8px 0; padding-left: 20px; color: #636e72; line-height: 1.8;">
-                        <li><strong>🏠 Đội nhà:</strong> Đội nhà thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
+                        <li><strong>🏠 Đội A:</strong> Đội A thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
                         <li><strong>🤝 Hòa:</strong> Cách biệt tỷ số <span class="highlight">dưới</span> số bàn chấp</li>
-                        <li><strong>✈️ Đội khách:</strong> Đội khách thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
+                        <li><strong>✈️ Đội B:</strong> Đội B thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
                     </ul>
                     <div class="example">
                         <strong>Ví dụ với kèo chấp 0.5:</strong><br>
@@ -423,40 +506,40 @@
             </div>
 
             <!-- Bảng tóm tắt -->
-            <div style="margin-top: 20px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                <table style="width: 100%; border-collapse: collapse;">
+            <div class="summary-table">
+                <table>
                     <thead>
-                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                            <th style="padding: 12px 16px; text-align: center;">Tỷ số</th>
-                            <th style="padding: 12px 16px; text-align: center;">Kèo chấp</th>
-                            <th style="padding: 12px 16px; text-align: center;">Điểm</th>
-                            <th style="padding: 12px 16px; text-align: center;">Kết quả</th>
+                        <tr>
+                            <th>Tỷ số</th>
+                            <th>Kèo chấp</th>
+                            <th>Điểm</th>
+                            <th>Kết quả</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
-                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
-                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #28a745;">+1</td>
-                            <td style="padding: 10px 16px; text-align: center;">🏆 Tuyệt vời!</td>
+                        <tr class="row-correct">
+                            <td>✅ Đúng</td>
+                            <td>✅ Đúng</td>
+                            <td style="font-weight: 700; color: #28a745;">+1</td>
+                            <td>🏆 Tuyệt vời!</td>
                         </tr>
-                        <tr style="border-bottom: 1px solid #f0f0f0; background: #fff8e1;">
-                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
-                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
-                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #fdcb6e;">+0.5</td>
-                            <td style="padding: 10px 16px; text-align: center;">⚠️ Gần đúng!</td>
+                        <tr class="row-half">
+                            <td>✅ Đúng</td>
+                            <td>❌ Sai</td>
+                            <td style="font-weight: 700; color: #fdcb6e;">+0.5</td>
+                            <td>⚠️ Gần đúng!</td>
                         </tr>
-                        <tr style="border-bottom: 1px solid #f0f0f0; background: #fff8e1;">
-                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
-                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
-                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #fdcb6e;">+0.5</td>
-                            <td style="padding: 10px 16px; text-align: center;">⚠️ Gần đúng!</td>
+                        <tr class="row-half">
+                            <td>❌ Sai</td>
+                            <td>✅ Đúng</td>
+                            <td style="font-weight: 700; color: #fdcb6e;">+0.5</td>
+                            <td>⚠️ Gần đúng!</td>
                         </tr>
-                        <tr>
-                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
-                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
-                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #dc3545;">0</td>
-                            <td style="padding: 10px 16px; text-align: center;">😅 Cố gắng lần sau!</td>
+                        <tr class="row-wrong">
+                            <td>❌ Sai</td>
+                            <td>❌ Sai</td>
+                            <td style="font-weight: 700; color: #dc3545;">0</td>
+                            <td>😅 Cố gắng lần sau!</td>
                         </tr>
                     </tbody>
                 </table>
@@ -465,23 +548,6 @@
             <div class="guide-footer">
                 📌 <span>Mỗi trận đấu chỉ được tối đa 1 điểm</span> — Hãy dự đoán thật chính xác để leo lên bảng xếp hạng! 🚀
             </div>
-        </section>
-
-        <!-- Lịch Thi Đấu -->
-        <section id="matches">
-            <h2>📅 Lịch Thi Đấu</h2>
-            <div id="matchList" class="match-grid">
-                <p style="text-align: center; padding: 20px;">Đang tải dữ liệu...</p>
-            </div>
-        </section>
-
-        <!-- Bảng Xếp Hạng -->
-        <section id="statistics">
-            <h2>🏆 Bảng Xếp Hạng</h2>
-            <div id="rankingTable">
-                <p style="text-align: center; padding: 20px;">Đang tải bảng xếp hạng...</p>
-            </div>
-            <div id="dailyStats"></div>
         </section>
     </main>
 
