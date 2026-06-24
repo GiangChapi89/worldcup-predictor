@@ -521,8 +521,19 @@ class MatchManager {
     // ============================================
     async checkIsAdmin(user) {
         if (!user) return false;
-        const adminEmails = ['songdaytronglong@gmail.com', 'admin@gmail.com'];
-        return adminEmails.includes(user.email);
+        
+        try {
+            const db = firebase.firestore();
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                const data = userDoc.data();
+                return data.role === 'admin' || data.isAdmin === true;
+            }
+        } catch (error) {
+            console.error('❌ Lỗi kiểm tra admin:', error);
+        }
+        
+        return false;
     }
 
     // ============================================
