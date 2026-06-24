@@ -7,7 +7,7 @@ class AuthManager {
     }
 
     initAuth() {
-        // Kiểm tra các element có tồn tại không
+        // Kiểm tra các element
         const elements = {
             loginBtn: document.getElementById('loginBtn'),
             logoutBtn: document.getElementById('logoutBtn'),
@@ -16,7 +16,8 @@ class AuthManager {
             submitLogin: document.getElementById('submitLogin'),
             submitRegister: document.getElementById('submitRegister'),
             switchToRegister: document.getElementById('switchToRegister'),
-            switchToLogin: document.getElementById('switchToLogin')
+            switchToLogin: document.getElementById('switchToLogin'),
+            forgotPassword: document.getElementById('forgotPassword')
         };
 
         // Kiểm tra element
@@ -34,25 +35,19 @@ class AuthManager {
                 const userRef = db.collection('users').doc(user.uid);
                 const doc = await userRef.get();
                 if (!doc.exists) {
-                    // Hiển thị form đặt nickname cho user mới
                     this.showNicknameSetup(user);
                 } else {
                     const userData = doc.data();
-                    // Kiểm tra nếu chưa có nickname thì yêu cầu đặt
                     if (!userData.nickname) {
                         this.showNicknameSetup(user);
                     } else {
-                        // 🔧 GỌI showUserInfo VỚI userData
                         await this.showUserInfo(user, userData);
                         this.loadUserData(user);
-                        
-                        // 🔥 THÊM: Lắng nghe thay đổi quyền admin real-time
                         this.listenAdminStatus(user.uid);
                     }
                 }
             } else {
                 this.showLoginSection();
-                // Hủy lắng nghe khi logout
                 if (this.adminUnsubscribe) {
                     this.adminUnsubscribe();
                     this.adminUnsubscribe = null;
@@ -61,23 +56,19 @@ class AuthManager {
         });
 
         // ============================================
-        // 🔧 SỬA: Các sự kiện click (ĐƯỢC ĐẶT TRONG initAuth)
+        // CÁC SỰ KIỆN CLICK
         // ============================================
         
         // Nút Đăng Nhập
         const loginBtn = document.getElementById('loginBtn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => this.showLoginModal());
-        } else {
-            console.error('❌ Không tìm thấy nút Đăng Nhập!');
         }
 
         // Nút Đăng Xuất
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
-        } else {
-            console.error('❌ Không tìm thấy nút Đăng Xuất!');
         }
 
         // Modal - Đóng khi click X
@@ -143,6 +134,15 @@ class AuthManager {
             });
         }
 
+        // Quên mật khẩu
+        const forgotPasswordLink = document.getElementById('forgotPassword');
+        if (forgotPasswordLink) {
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.resetPassword();
+            });
+        }
+
         // Enter key support
         const loginEmail = document.getElementById('loginEmail');
         const loginPassword = document.getElementById('loginPassword');
@@ -202,7 +202,6 @@ class AuthManager {
     // LẮNG NGHE THAY ĐỔI QUYỀN ADMIN REAL-TIME
     // ============================================
     listenAdminStatus(userId) {
-        // Hủy lắng nghe cũ nếu có
         if (this.adminUnsubscribe) {
             this.adminUnsubscribe();
             this.adminUnsubscribe = null;
@@ -210,7 +209,6 @@ class AuthManager {
 
         if (!userId) return;
         
-        // Lắng nghe thay đổi của user document
         this.adminUnsubscribe = db.collection('users').doc(userId)
             .onSnapshot((doc) => {
                 if (doc.exists) {
@@ -232,13 +230,12 @@ class AuthManager {
     }
 
     // ============================================
-    // HIỂN THỊ THÔNG TIN USER - KIỂM TRA QUYỀN ADMIN TỪ FIRESTORE
+    // HIỂN THỊ THÔNG TIN USER
     // ============================================
     async showUserInfo(user, userData) {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
         
-        // Lấy nickname từ userData hoặc dùng displayName/email
         const displayName = userData?.nickname || userData?.name || user.displayName || user.email || 'User';
         
         if (userInfo) userInfo.style.display = 'flex';
@@ -252,26 +249,17 @@ class AuthManager {
         const welcomeMsg = document.getElementById('welcomeMessage');
         if (welcomeMsg) welcomeMsg.style.display = 'block';
         
-        // Thêm nút đổi tên
         this.addChangeNameButton();
 
-        // 🔧 KIỂM TRA QUYỀN ADMIN TỪ FIRESTORE
         try {
-            // Nếu có userData truyền vào, kiểm tra trực tiếp
             if (userData) {
                 const isAdmin = userData.role === 'admin' || userData.isAdmin === true;
                 const adminLink = document.getElementById('adminLink');
                 if (adminLink) {
-                    if (isAdmin) {
-                        adminLink.style.display = 'inline-block';
-                        console.log('👑 User có quyền admin (từ userData)');
-                    } else {
-                        adminLink.style.display = 'none';
-                        console.log('👤 User không có quyền admin (từ userData)');
-                    }
+                    adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+                    console.log(isAdmin ? '👑 User có quyền admin (từ userData)' : '👤 User không có quyền admin (từ userData)');
                 }
             } else {
-                // Nếu không có userData, lấy từ Firestore
                 const userRef = db.collection('users').doc(user.uid);
                 const doc = await userRef.get();
                 if (doc.exists) {
@@ -279,13 +267,8 @@ class AuthManager {
                     const isAdmin = data.role === 'admin' || data.isAdmin === true;
                     const adminLink = document.getElementById('adminLink');
                     if (adminLink) {
-                        if (isAdmin) {
-                            adminLink.style.display = 'inline-block';
-                            console.log('👑 User có quyền admin (từ Firestore)');
-                        } else {
-                            adminLink.style.display = 'none';
-                            console.log('👤 User không có quyền admin (từ Firestore)');
-                        }
+                        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+                        console.log(isAdmin ? '👑 User có quyền admin (từ Firestore)' : '👤 User không có quyền admin (từ Firestore)');
                     }
                 }
             }
@@ -302,7 +285,6 @@ class AuthManager {
     // HIỂN THỊ FORM ĐẶT NICKNAME
     // ============================================
     showNicknameSetup(user) {
-        // Tạo modal đặt nickname
         const modalHtml = `
             <div id="nicknameModal" class="modal" style="display:block;">
                 <div class="modal-content" style="max-width: 400px;">
@@ -334,13 +316,11 @@ class AuthManager {
         modalContainer.innerHTML = modalHtml;
         document.body.appendChild(modalContainer.firstElementChild);
 
-        // Focus vào input
         setTimeout(() => {
             const input = document.getElementById('nicknameInput');
             if (input) input.focus();
         }, 100);
 
-        // Enter key để submit
         const nicknameInput = document.getElementById('nicknameInput');
         if (nicknameInput) {
             nicknameInput.addEventListener('keypress', (e) => {
@@ -388,7 +368,6 @@ class AuthManager {
                 return;
             }
 
-            // Kiểm tra nickname đã tồn tại chưa
             const existingUser = await db.collection('users')
                 .where('nickname', '==', nickname)
                 .get();
@@ -408,7 +387,6 @@ class AuthManager {
                 }
             }
 
-            // Lưu nickname vào Firestore
             const userRef = db.collection('users').doc(user.uid);
             await userRef.set({
                 nickname: nickname,
@@ -424,18 +402,13 @@ class AuthManager {
                 lastLogin: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
 
-            // Đóng modal
             const modal = document.getElementById('nicknameModal');
             if (modal) modal.remove();
 
-            // Lấy dữ liệu user vừa lưu
             const userData = (await userRef.get()).data();
             
-            // Cập nhật UI
             await this.showUserInfo(user, userData);
             this.loadUserData(user);
-            
-            // 🔥 THÊM: Lắng nghe thay đổi quyền admin
             this.listenAdminStatus(user.uid);
 
             console.log('✅ Đã lưu nickname:', nickname);
@@ -474,14 +447,10 @@ class AuthManager {
             const modal = document.getElementById('nicknameModal');
             if (modal) modal.remove();
 
-            // Lấy dữ liệu user vừa lưu
             const userData = (await userRef.get()).data();
             
-            // Cập nhật UI
             await this.showUserInfo(user, userData);
             this.loadUserData(user);
-            
-            // 🔥 THÊM: Lắng nghe thay đổi quyền admin
             this.listenAdminStatus(user.uid);
 
             console.log('✅ Đã bỏ qua đặt nickname, dùng:', defaultName);
@@ -509,7 +478,6 @@ class AuthManager {
         try {
             const nickname = newNickname.trim();
 
-            // Kiểm tra trùng tên
             const existingUser = await db.collection('users')
                 .where('nickname', '==', nickname)
                 .get();
@@ -532,7 +500,6 @@ class AuthManager {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Cập nhật UI
             const userData = (await userRef.get()).data();
             await this.showUserInfo(user, userData);
             window.currentUserName = nickname;
@@ -630,6 +597,43 @@ class AuthManager {
     }
 
     // ============================================
+    // RESET MẬT KHẨU
+    // ============================================
+    async resetPassword() {
+        const emailInput = document.getElementById('loginEmail');
+        if (!emailInput) {
+            alert('⚠️ Vui lòng nhập email!');
+            return;
+        }
+        
+        const email = emailInput.value.trim();
+        if (!email) {
+            alert('⚠️ Vui lòng nhập email để reset mật khẩu!');
+            return;
+        }
+        
+        if (!confirm(`Bạn có chắc muốn gửi email reset mật khẩu đến ${email}?`)) {
+            return;
+        }
+        
+        try {
+            await auth.sendPasswordResetEmail(email);
+            alert(`✅ Đã gửi email reset mật khẩu đến ${email}.\nVui lòng kiểm tra hộp thư (cả spam).`);
+        } catch (error) {
+            console.error('❌ Lỗi reset mật khẩu:', error);
+            let message = 'Lỗi reset mật khẩu: ';
+            if (error.code === 'auth/user-not-found') {
+                message += 'Email chưa được đăng ký.';
+            } else if (error.code === 'auth/network-request-failed') {
+                message += 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+            } else {
+                message += error.message;
+            }
+            alert('❌ ' + message);
+        }
+    }
+
+    // ============================================
     // HIỂN THỊ LOGIN SECTION
     // ============================================
     showLoginSection() {
@@ -642,7 +646,6 @@ class AuthManager {
         const welcomeMsg = document.getElementById('welcomeMessage');
         if (welcomeMsg) welcomeMsg.style.display = 'none';
         
-        // Ẩn nút admin khi chưa đăng nhập
         const adminLink = document.getElementById('adminLink');
         if (adminLink) adminLink.style.display = 'none';
         
@@ -653,7 +656,7 @@ class AuthManager {
     }
 
     // ============================================
-    // CÁC HÀM KHÁC
+    // RESET FORMS
     // ============================================
     resetForms() {
         const emailForm = document.getElementById('emailLoginForm');
@@ -688,6 +691,9 @@ class AuthManager {
         });
     }
 
+    // ============================================
+    // ĐĂNG NHẬP GOOGLE
+    // ============================================
     async loginWithGoogle() {
         try {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -703,8 +709,9 @@ class AuthManager {
         }
     }
 
-    // js/auth.js - CẬP NHẬT HÀM loginWithEmail
-
+    // ============================================
+    // ĐĂNG NHẬP EMAIL
+    // ============================================
     async loginWithEmail() {
         const emailInput = document.getElementById('loginEmail');
         const passwordInput = document.getElementById('loginPassword');
@@ -722,14 +729,12 @@ class AuthManager {
             return;
         }
 
-        // Kiểm tra mật khẩu tối thiểu
         if (password.length < 6) {
             alert('⚠️ Mật khẩu phải có ít nhất 6 ký tự!');
             return;
         }
 
         try {
-            // Hiển thị loading
             const submitBtn = document.getElementById('submitLogin');
             if (submitBtn) {
                 submitBtn.disabled = true;
@@ -765,6 +770,9 @@ class AuthManager {
         }
     }
 
+    // ============================================
+    // ĐĂNG KÝ
+    // ============================================
     async register() {
         const nameInput = document.getElementById('registerName');
         const emailInput = document.getElementById('registerEmail');
@@ -790,6 +798,12 @@ class AuthManager {
         }
 
         try {
+            const submitBtn = document.getElementById('submitRegister');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Đang đăng ký...';
+            }
+            
             const result = await auth.createUserWithEmailAndPassword(email, password);
             await result.user.updateProfile({
                 displayName: name
@@ -809,9 +823,18 @@ class AuthManager {
                 message += error.message;
             }
             alert('❌ ' + message);
+        } finally {
+            const submitBtn = document.getElementById('submitRegister');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Đăng Ký';
+            }
         }
     }
 
+    // ============================================
+    // HIỂN THỊ MODAL ĐĂNG NHẬP
+    // ============================================
     showLoginModal() {
         const modal = document.getElementById('loginModal');
         if (modal) {
@@ -822,6 +845,9 @@ class AuthManager {
         }
     }
 
+    // ============================================
+    // ĐÓNG MODAL
+    // ============================================
     closeModal() {
         const modal = document.getElementById('loginModal');
         if (modal) {
@@ -830,6 +856,9 @@ class AuthManager {
         }
     }
 
+    // ============================================
+    // ENABLE PREDICTION
+    // ============================================
     enablePrediction(enable) {
         const predictButtons = document.querySelectorAll('.predict-btn');
         predictButtons.forEach(btn => {
@@ -843,6 +872,9 @@ class AuthManager {
         });
     }
 
+    // ============================================
+    // LOAD USER DATA
+    // ============================================
     async loadUserData(user) {
         try {
             const doc = await db.collection('users').doc(user.uid).get();
@@ -856,9 +888,11 @@ class AuthManager {
         }
     }
 
+    // ============================================
+    // ĐĂNG XUẤT
+    // ============================================
     async logout() {
         try {
-            // Hủy lắng nghe admin status
             if (this.adminUnsubscribe) {
                 this.adminUnsubscribe();
                 this.adminUnsubscribe = null;
@@ -872,58 +906,13 @@ class AuthManager {
             console.error('❌ Lỗi đăng xuất:', error);
         }
     }
-
-    // js/auth.js - THÊM HÀM RESET MẬT KHẨU
-
-    async resetPassword() {
-        const emailInput = document.getElementById('loginEmail');
-        if (!emailInput) {
-            alert('⚠️ Vui lòng nhập email!');
-            return;
-        }
-        
-        const email = emailInput.value.trim();
-        if (!email) {
-            alert('⚠️ Vui lòng nhập email để reset mật khẩu!');
-            return;
-        }
-        
-        if (!confirm(`Bạn có chắc muốn gửi email reset mật khẩu đến ${email}?`)) {
-            return;
-        }
-        
-        try {
-            await auth.sendPasswordResetEmail(email);
-            alert(`✅ Đã gửi email reset mật khẩu đến ${email}.\nVui lòng kiểm tra hộp thư (cả spam).`);
-        } catch (error) {
-            console.error('❌ Lỗi reset mật khẩu:', error);
-            let message = 'Lỗi reset mật khẩu: ';
-            if (error.code === 'auth/user-not-found') {
-                message += 'Email chưa được đăng ký.';
-            } else if (error.code === 'auth/network-request-failed') {
-                message += 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
-            } else {
-                message += error.message;
-            }
-            alert('❌ ' + message);
-        }
-    }
-
-    // Thêm event listener cho nút Quên mật khẩu
-    // Trong initAuth():
-    const forgotPasswordLink = document.getElementById('forgotPassword');
-    if (forgotPasswordLink) {
-        forgotPasswordLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.resetPassword();
-        });
-    }
 }
 
-// Khởi tạo Auth Manager
+// ============================================
+// KHỞI TẠO AUTH MANAGER
+// ============================================
 let authManager;
 
-// Đợi DOM load xong mới khởi tạo
 document.addEventListener('DOMContentLoaded', function() {
     try {
         authManager = new AuthManager();
@@ -934,7 +923,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Nếu DOM đã load, khởi tạo ngay
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     try {
         authManager = new AuthManager();
