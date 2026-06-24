@@ -144,8 +144,127 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
+        /* ============================================
+           HƯỚNG DẪN TÍNH ĐIỂM
+           ============================================ */
+        .scoring-guide {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .scoring-guide h2 {
+            color: #2d3436;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .scoring-guide .guide-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .scoring-guide .guide-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-top: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .scoring-guide .guide-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .scoring-guide .guide-card h4 {
+            color: #2d3436;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scoring-guide .guide-card p {
+            color: #636e72;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            margin: 5px 0;
+        }
+
+        .scoring-guide .guide-card .highlight {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .scoring-guide .guide-card .highlight-green {
+            font-weight: 700;
+            color: #00b894;
+        }
+
+        .scoring-guide .guide-card .highlight-red {
+            font-weight: 700;
+            color: #dc3545;
+        }
+
+        .scoring-guide .guide-card .highlight-yellow {
+            font-weight: 700;
+            color: #fdcb6e;
+        }
+
+        .scoring-guide .guide-card .example {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            border-left: 3px solid #667eea;
+        }
+
+        .scoring-guide .guide-card .example strong {
+            color: #2d3436;
+        }
+
+        .scoring-guide .guide-footer {
+            margin-top: 20px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            font-size: 1.05rem;
+        }
+
+        .scoring-guide .guide-footer span {
+            font-weight: 700;
+            font-size: 1.3rem;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
+            .scoring-guide .guide-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .scoring-guide {
+                padding: 20px;
+            }
+
+            .scoring-guide h2 {
+                font-size: 1.3rem;
+            }
+
             .group-header {
                 flex-direction: column;
                 text-align: center;
@@ -190,6 +309,15 @@
                 font-size: 10px;
                 padding: 2px 10px;
             }
+
+            .scoring-guide .guide-card {
+                padding: 15px;
+            }
+
+            .scoring-guide .guide-footer {
+                font-size: 0.95rem;
+                padding: 12px 15px;
+            }
         }
     </style>
 </head>
@@ -204,6 +332,7 @@
                 <ul>
                     <li><a href="#matches">🏆 Trận Đấu</a></li>
                     <li><a href="#statistics">📊 Bảng Xếp Hạng</a></li>
+                    <li><a href="#scoringGuide">📖 Hướng dẫn</a></li>
                     <li><a href="history.html" id="historyLink" style="display:none;">📋 Lịch sử</a></li>
                     <li><a href="admin.html" id="adminLink" style="display:none;">⚙️ Admin</a></li>
                 </ul>
@@ -230,6 +359,115 @@
             </div>
         </div>
 
+        <!-- ============================================ -->
+        <!-- HƯỚNG DẪN TÍNH ĐIỂM -->
+        <!-- ============================================ -->
+        <section id="scoringGuide" class="scoring-guide">
+            <h2>📖 Hướng Dẫn Tính Điểm</h2>
+            <p style="color: #636e72; margin-bottom: 5px; font-size: 1.05rem;">
+                Mỗi trận đấu bạn dự đoán sẽ được tính điểm dựa trên <strong>tỷ số chính xác</strong> và <strong>kèo chấp</strong> bạn chọn.
+                <strong style="color: #667eea;">Tối đa 1 điểm cho mỗi trận.</strong>
+            </p>
+            
+            <div class="guide-grid">
+                <!-- Card 1: Điểm tối đa -->
+                <div class="guide-card">
+                    <h4>🎯 Điểm tối đa: <span class="highlight">1 điểm/trận</span></h4>
+                    <p>Bạn có thể đạt tối đa <strong class="highlight">1 điểm</strong> cho mỗi trận đấu nếu dự đoán <strong>chính xác cả tỷ số và kèo chấp</strong>.</p>
+                    <div class="example">
+                        <strong>Ví dụ:</strong> Dự đoán <strong>Brazil 2-1 Argentina</strong> và chọn <strong>Brazil</strong> thắng với kèo chấp 0.25<br>
+                        → Kết quả đúng → ✅ <strong>+1 điểm</strong>
+                    </div>
+                </div>
+
+                <!-- Card 2: Điểm nửa điểm -->
+                <div class="guide-card">
+                    <h4>⚠️ Điểm nửa điểm: <span class="highlight-yellow">0.5 điểm</span></h4>
+                    <p>Bạn nhận được <strong class="highlight-yellow">0.5 điểm</strong> nếu <strong>chỉ đúng tỷ số</strong> hoặc <strong>chỉ đúng kèo chấp</strong>.</p>
+                    <div class="example">
+                        <strong>Ví dụ 1:</strong> Dự đoán <strong>Brazil 2-1 Argentina</strong> nhưng chọn sai kèo chấp<br>
+                        → Đúng tỷ số, sai kèo → ⚠️ <strong>+0.5 điểm</strong>
+                    </div>
+                    <div class="example">
+                        <strong>Ví dụ 2:</strong> Dự đoán sai tỷ số nhưng chọn đúng kèo chấp<br>
+                        → Sai tỷ số, đúng kèo → ⚠️ <strong>+0.5 điểm</strong>
+                    </div>
+                </div>
+
+                <!-- Card 3: 0 điểm -->
+                <div class="guide-card">
+                    <h4>❌ 0 điểm</h4>
+                    <p>Bạn không nhận được điểm nào nếu <strong>sai cả tỷ số và kèo chấp</strong>.</p>
+                    <div class="example">
+                        <strong>Ví dụ:</strong> Dự đoán <strong>Brazil 3-0 Argentina</strong> và chọn sai kèo chấp<br>
+                        → Kết quả không đúng → ❌ <strong>0 điểm</strong>
+                    </div>
+                </div>
+
+                <!-- Card 4: Kèo chấp -->
+                <div class="guide-card" style="border-top-color: #fdcb6e;">
+                    <h4>⚡ Kèo Chấp Trái</h4>
+                    <p><strong>Kèo chấp trái</strong> là tỷ lệ chấp giữa hai đội. Bạn có 3 lựa chọn:</p>
+                    <ul style="margin: 8px 0; padding-left: 20px; color: #636e72; line-height: 1.8;">
+                        <li><strong>🏠 Đội nhà:</strong> Đội nhà thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
+                        <li><strong>🤝 Hòa:</strong> Cách biệt tỷ số <span class="highlight">dưới</span> số bàn chấp</li>
+                        <li><strong>✈️ Đội khách:</strong> Đội khách thắng cách biệt <span class="highlight">trên</span> số bàn chấp</li>
+                    </ul>
+                    <div class="example">
+                        <strong>Ví dụ với kèo chấp 0.5:</strong><br>
+                        • Brazil 2-1 Argentina → Chọn <strong>Brazil</strong> thắng → ✅<br>
+                        • Brazil 1-1 Argentina → Chọn <strong>Hòa</strong> → ✅<br>
+                        • Brazil 0-1 Argentina → Chọn <strong>Argentina</strong> thắng → ✅
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bảng tóm tắt -->
+            <div style="margin-top: 20px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <th style="padding: 12px 16px; text-align: center;">Tỷ số</th>
+                            <th style="padding: 12px 16px; text-align: center;">Kèo chấp</th>
+                            <th style="padding: 12px 16px; text-align: center;">Điểm</th>
+                            <th style="padding: 12px 16px; text-align: center;">Kết quả</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
+                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
+                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #28a745;">+1</td>
+                            <td style="padding: 10px 16px; text-align: center;">🏆 Tuyệt vời!</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f0f0f0; background: #fff8e1;">
+                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
+                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
+                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #fdcb6e;">+0.5</td>
+                            <td style="padding: 10px 16px; text-align: center;">⚠️ Gần đúng!</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f0f0f0; background: #fff8e1;">
+                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
+                            <td style="padding: 10px 16px; text-align: center;">✅ Đúng</td>
+                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #fdcb6e;">+0.5</td>
+                            <td style="padding: 10px 16px; text-align: center;">⚠️ Gần đúng!</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
+                            <td style="padding: 10px 16px; text-align: center;">❌ Sai</td>
+                            <td style="padding: 10px 16px; text-align: center; font-weight: 700; color: #dc3545;">0</td>
+                            <td style="padding: 10px 16px; text-align: center;">😅 Cố gắng lần sau!</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="guide-footer">
+                📌 <span>Mỗi trận đấu chỉ được tối đa 1 điểm</span> — Hãy dự đoán thật chính xác để leo lên bảng xếp hạng! 🚀
+            </div>
+        </section>
+
+        <!-- Lịch Thi Đấu -->
         <section id="matches">
             <h2>📅 Lịch Thi Đấu</h2>
             <div id="matchList" class="match-grid">
@@ -237,6 +475,7 @@
             </div>
         </section>
 
+        <!-- Bảng Xếp Hạng -->
         <section id="statistics">
             <h2>🏆 Bảng Xếp Hạng</h2>
             <div id="rankingTable">
