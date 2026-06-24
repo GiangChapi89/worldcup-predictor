@@ -1,4 +1,3 @@
-// js/admin.js - SỬA HÀM checkAdmin
 
 // ============================================
 // DANH SÁCH ADMIN EMAIL (SUPER ADMIN) - CHỈ DÙNG CHO SUPER ADMIN
@@ -335,3 +334,47 @@ async function deleteMatchResult(matchId) {
         alert('❌ Lỗi: ' + error.message);
     }
 }
+// ĐĂNG XUẤT
+// ============================================
+function logout() {
+    if (confirm('Bạn có muốn đăng xuất?')) {
+        firebase.auth().signOut().then(() => {
+            window.location.href = 'index.html';
+        }).catch((error) => {
+            console.error('❌ Lỗi đăng xuất:', error);
+            alert('❌ Lỗi đăng xuất: ' + error.message);
+        });
+    }
+}
+
+// ===========================================
+// KIỂM TRA VÀ KHỞI TẠO
+// ============================================
+console.log('🔄 Initializing admin page...');
+
+// Đảm bảo các hàm được định nghĩa toàn cục
+window.logout = logout;
+window.loadMatches = loadMatches;
+window.loadUsers = loadUsers;
+window.loadPredictions = loadPredictions;
+window.loadLogs = loadLogs;
+window.loadDashboard = loadDashboard;
+window.showAddMatchForm = showAddMatchForm;
+window.saveMatch = saveMatch;
+window.editMatch = editMatch;
+window.deleteMatch = deleteMatch;
+window.showResultForm = showResultForm;
+window.submitMatchResult = submitMatchResult;
+window.cancelResultForm = cancelResultForm;
+window.deleteMatchResult = deleteMatchResult;
+window.viewMatchResult = viewMatchResult;
+window.manualCalculatePoints = manualCalculatePoints;
+window.calculateAllMatches = calculateAllMatches;
+window.resetMatchPoints = resetMatchPoints;
+window.resetSystem = resetSystem;
+window.approveAdmin = approveAdmin;
+window.revokeAdmin = revokeAdmin;
+window.exportUsers = exportUsers;
+window.checkAdmin = checkAdmin;
+
+console.log('✅ All admin functions exported to window');
