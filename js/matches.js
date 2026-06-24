@@ -39,6 +39,8 @@ class MatchManager {
     // ============================================
     // HIỂN THỊ DANH SÁCH TRẬN ĐẤU
     // ============================================
+    // js/matches.js - CẬP NHẬT HÀM renderMatches
+
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -48,42 +50,91 @@ class MatchManager {
             return;
         }
 
-        container.innerHTML = this.matches.map(match => {
-            const isFinished = match.status === 'finished';
-            const isLoggedIn = !!window.currentUserId;
-            const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
+        // Nhóm các trận đấu theo bảng
+        const groupedMatches = this.matches.reduce((groups, match) => {
+            const group = match.group || 'Chưa xếp bảng';
+            if (!groups[group]) {
+                groups[group] = [];
+            }
+            groups[group].push(match);
+            return groups;
+        }, {});
+
+        let html = '';
+
+        // Sắp xếp các bảng theo thứ tự
+        const sortedGroups = Object.keys(groupedMatches).sort();
+
+        for (const groupName of sortedGroups) {
+            const matches = groupedMatches[groupName];
             
-            return `
-                <div class="match-card">
-                    <div class="match-info">
-                        <span class="team">${match.homeTeam || '?'}</span>
-                        <span class="vs">vs</span>
-                        <span class="team">${match.awayTeam || '?'}</span>
+            // Header của bảng
+            html += `
+                <div class="group-section">
+                    <div class="group-header">
+                        <h3 class="group-title">🏆 ${groupName}</h3>
+                        <span class="group-count">${matches.length} trận</span>
                     </div>
-                    <div class="match-details">
-                        <span>📅 ${match.date || 'N/A'}</span>
-                        <span>⏰ ${match.time || 'N/A'}</span>
-                        <span>${handicapDisplay}</span>
+                    <div class="match-grid">
+            `;
+
+            // Hiển thị các trận trong bảng
+            matches.forEach(match => {
+                const isFinished = match.status === 'finished';
+                const isLoggedIn = !!window.currentUserId;
+                const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
+                
+                // Lấy thông tin bảng đấu
+                const groupDisplay = match.group ? `🏆 ${match.group}` : '';
+
+                html += `
+                    <div class="match-card">
+                        <div class="match-header">
+                            <div class="match-info">
+                                <span class="team">${match.homeTeam || '?'}</span>
+                                <span class="vs">vs</span>
+                                <span class="team">${match.awayTeam || '?'}</span>
+                            </div>
+                            <div class="match-badge">
+                                <span class="match-status-badge ${isFinished ? 'finished' : 'upcoming'}">
+                                    ${isFinished ? '✅ Đã kết thúc' : '⏳ Sắp diễn ra'}
+                                </span>
+                                ${match.group ? `<span class="group-badge">${match.group}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="match-details">
+                            <span>📅 ${match.date || 'N/A'}</span>
+                            <span>⏰ ${match.time || 'N/A'}</span>
+                            <span>${handicapDisplay}</span>
+                            ${match.stage ? `<span>🏷️ ${match.stage}</span>` : ''}
+                        </div>
+                        <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
+                            ${isFinished ? 
+                                `${match.homeScore} - ${match.awayScore} 🏆` : 
+                                '⏳ Chưa diễn ra'}
+                        </div>
+                        ${!isFinished ? `
+                            <button class="predict-btn" onclick="predictMatch('${match.id}')" 
+                                    ${!isLoggedIn ? 'disabled' : ''}>
+                                ${isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán'}
+                            </button>
+                        ` : `
+                            <button class="predict-btn" onclick="viewMatchHistory('${match.id}')" 
+                                    style="background: linear-gradient(135deg, #00b894, #00a86b);">
+                                📊 Xem chi tiết
+                            </button>
+                        `}
                     </div>
-                    <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
-                        ${isFinished ? 
-                            `${match.homeScore} - ${match.awayScore} 🏆` : 
-                            '⏳ Chưa diễn ra'}
+                `;
+            });
+
+            html += `
                     </div>
-                    ${!isFinished ? `
-                        <button class="predict-btn" onclick="predictMatch('${match.id}')" 
-                                ${!isLoggedIn ? 'disabled' : ''}>
-                            ${isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán'}
-                        </button>
-                    ` : `
-                        <button class="predict-btn" onclick="viewMatchHistory('${match.id}')" 
-                                style="background: linear-gradient(135deg, #00b894, #00a86b);">
-                            📊 Xem chi tiết
-                        </button>
-                    `}
                 </div>
             `;
-        }).join('');
+        }
+
+        container.innerHTML = html;
     }
 
     // ============================================

@@ -1116,3 +1116,116 @@ section h2 {
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
+/* style.css - Thêm style cho group section */
+
+/* ============================================
+   GROUP SECTION - BẢNG ĐẤU
+   ============================================ */
+.group-section {
+    margin-bottom: 35px;
+}
+
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px 10px 0 0;
+    margin-bottom: 0;
+}
+
+.group-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.group-count {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.group-section .match-grid {
+    border-radius: 0 0 10px 10px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+}
+
+/* Match Header */
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.match-badge {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.match-status-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.match-status-badge.upcoming {
+    background: #ffc107;
+    color: #333;
+}
+
+.match-status-badge.finished {
+    background: #28a745;
+    color: white;
+}
+
+.group-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #667eea;
+    color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .group-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 5px;
+        padding: 10px 15px;
+    }
+    
+    .group-title {
+        font-size: 1rem;
+    }
+    
+    .match-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .match-badge {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
