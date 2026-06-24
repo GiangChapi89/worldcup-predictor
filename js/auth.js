@@ -7,8 +7,29 @@ class AuthManager {
     }
 
     initAuth() {
+        // Kiểm tra các element có tồn tại không
+        const elements = {
+            loginBtn: document.getElementById('loginBtn'),
+            logoutBtn: document.getElementById('logoutBtn'),
+            googleLogin: document.getElementById('googleLogin'),
+            emailLogin: document.getElementById('emailLogin'),
+            submitLogin: document.getElementById('submitLogin'),
+            submitRegister: document.getElementById('submitRegister'),
+            switchToRegister: document.getElementById('switchToRegister'),
+            switchToLogin: document.getElementById('switchToLogin')
+        };
+
+        // Kiểm tra element
+        for (const [key, element] of Object.entries(elements)) {
+            if (!element) {
+                console.warn(`⚠️ Element #${key} not found`);
+            }
+        }
+
         // Theo dõi trạng thái đăng nhập
         auth.onAuthStateChanged(async (user) => {
+            console.log('🔔 Auth state changed:', user?.email || 'No user');
+            
             if (user) {
                 const userRef = db.collection('users').doc(user.uid);
                 const doc = await userRef.get();
@@ -39,7 +60,142 @@ class AuthManager {
             }
         });
 
-        // ... Các sự kiện click khác giữ nguyên ...
+        // ============================================
+        // 🔧 SỬA: Các sự kiện click (ĐƯỢC ĐẶT TRONG initAuth)
+        // ============================================
+        
+        // Nút Đăng Nhập
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', () => this.showLoginModal());
+        } else {
+            console.error('❌ Không tìm thấy nút Đăng Nhập!');
+        }
+
+        // Nút Đăng Xuất
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
+        } else {
+            console.error('❌ Không tìm thấy nút Đăng Xuất!');
+        }
+
+        // Modal - Đóng khi click X
+        const modal = document.getElementById('loginModal');
+        const closeBtn = document.querySelector('.close');
+        if (modal && closeBtn) {
+            closeBtn.onclick = () => {
+                modal.style.display = 'none';
+                this.resetForms();
+            };
+            window.onclick = (event) => {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                    this.resetForms();
+                }
+            };
+        }
+
+        // Đăng nhập Google
+        const googleLoginBtn = document.getElementById('googleLogin');
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', () => this.loginWithGoogle());
+        }
+
+        // Đăng nhập Email - Mở form email
+        const emailLoginBtn = document.getElementById('emailLogin');
+        if (emailLoginBtn) {
+            emailLoginBtn.addEventListener('click', () => {
+                document.getElementById('emailLoginForm').style.display = 'block';
+                document.getElementById('registerForm').style.display = 'none';
+            });
+        }
+
+        // Submit Login
+        const submitLoginBtn = document.getElementById('submitLogin');
+        if (submitLoginBtn) {
+            submitLoginBtn.addEventListener('click', () => this.loginWithEmail());
+        }
+
+        // Submit Register
+        const submitRegisterBtn = document.getElementById('submitRegister');
+        if (submitRegisterBtn) {
+            submitRegisterBtn.addEventListener('click', () => this.register());
+        }
+
+        // Switch to Register
+        const switchToRegister = document.getElementById('switchToRegister');
+        if (switchToRegister) {
+            switchToRegister.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('emailLoginForm').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'block';
+            });
+        }
+
+        // Switch to Login
+        const switchToLogin = document.getElementById('switchToLogin');
+        if (switchToLogin) {
+            switchToLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById('emailLoginForm').style.display = 'block';
+                document.getElementById('registerForm').style.display = 'none';
+            });
+        }
+
+        // Enter key support
+        const loginEmail = document.getElementById('loginEmail');
+        const loginPassword = document.getElementById('loginPassword');
+        const registerName = document.getElementById('registerName');
+        const registerEmail = document.getElementById('registerEmail');
+        const registerPassword = document.getElementById('registerPassword');
+
+        if (loginEmail) {
+            loginEmail.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (loginPassword) loginPassword.focus();
+                }
+            });
+        }
+        
+        if (loginPassword) {
+            loginPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.loginWithEmail();
+                }
+            });
+        }
+
+        if (registerName) {
+            registerName.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (registerEmail) registerEmail.focus();
+                }
+            });
+        }
+        
+        if (registerEmail) {
+            registerEmail.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (registerPassword) registerPassword.focus();
+                }
+            });
+        }
+        
+        if (registerPassword) {
+            registerPassword.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.register();
+                }
+            });
+        }
+
+        console.log('✅ Auth events initialized');
     }
 
     // ============================================
@@ -63,10 +219,10 @@ class AuthManager {
                     const adminLink = document.getElementById('adminLink');
                     
                     if (isAdmin) {
-                        adminLink.style.display = 'inline-block';
+                        if (adminLink) adminLink.style.display = 'inline-block';
                         console.log('👑 Quyền admin đã được cập nhật (real-time)');
                     } else {
-                        adminLink.style.display = 'none';
+                        if (adminLink) adminLink.style.display = 'none';
                         console.log('👤 Quyền admin đã bị thu hồi (real-time)');
                     }
                 }
@@ -85,12 +241,16 @@ class AuthManager {
         // Lấy nickname từ userData hoặc dùng displayName/email
         const displayName = userData?.nickname || userData?.name || user.displayName || user.email || 'User';
         
-        userInfo.style.display = 'flex';
-        loginSection.style.display = 'none';
+        if (userInfo) userInfo.style.display = 'flex';
+        if (loginSection) loginSection.style.display = 'none';
         
-        document.getElementById('displayName').textContent = displayName;
-        document.getElementById('userName').textContent = displayName;
-        document.getElementById('welcomeMessage').style.display = 'block';
+        const displayNameEl = document.getElementById('displayName');
+        const userNameEl = document.getElementById('userName');
+        if (displayNameEl) displayNameEl.textContent = displayName;
+        if (userNameEl) userNameEl.textContent = displayName;
+        
+        const welcomeMsg = document.getElementById('welcomeMessage');
+        if (welcomeMsg) welcomeMsg.style.display = 'block';
         
         // Thêm nút đổi tên
         this.addChangeNameButton();
@@ -100,12 +260,15 @@ class AuthManager {
             // Nếu có userData truyền vào, kiểm tra trực tiếp
             if (userData) {
                 const isAdmin = userData.role === 'admin' || userData.isAdmin === true;
-                if (isAdmin) {
-                    document.getElementById('adminLink').style.display = 'inline-block';
-                    console.log('👑 User có quyền admin (từ userData)');
-                } else {
-                    document.getElementById('adminLink').style.display = 'none';
-                    console.log('👤 User không có quyền admin (từ userData)');
+                const adminLink = document.getElementById('adminLink');
+                if (adminLink) {
+                    if (isAdmin) {
+                        adminLink.style.display = 'inline-block';
+                        console.log('👑 User có quyền admin (từ userData)');
+                    } else {
+                        adminLink.style.display = 'none';
+                        console.log('👤 User không có quyền admin (từ userData)');
+                    }
                 }
             } else {
                 // Nếu không có userData, lấy từ Firestore
@@ -114,19 +277,22 @@ class AuthManager {
                 if (doc.exists) {
                     const data = doc.data();
                     const isAdmin = data.role === 'admin' || data.isAdmin === true;
-                    
-                    if (isAdmin) {
-                        document.getElementById('adminLink').style.display = 'inline-block';
-                        console.log('👑 User có quyền admin (từ Firestore)');
-                    } else {
-                        document.getElementById('adminLink').style.display = 'none';
-                        console.log('👤 User không có quyền admin (từ Firestore)');
+                    const adminLink = document.getElementById('adminLink');
+                    if (adminLink) {
+                        if (isAdmin) {
+                            adminLink.style.display = 'inline-block';
+                            console.log('👑 User có quyền admin (từ Firestore)');
+                        } else {
+                            adminLink.style.display = 'none';
+                            console.log('👤 User không có quyền admin (từ Firestore)');
+                        }
                     }
                 }
             }
         } catch (error) {
             console.error('❌ Lỗi kiểm tra quyền admin:', error);
-            document.getElementById('adminLink').style.display = 'none';
+            const adminLink = document.getElementById('adminLink');
+            if (adminLink) adminLink.style.display = 'none';
         }
         
         this.enablePrediction(true);
@@ -170,38 +336,48 @@ class AuthManager {
 
         // Focus vào input
         setTimeout(() => {
-            document.getElementById('nicknameInput').focus();
+            const input = document.getElementById('nicknameInput');
+            if (input) input.focus();
         }, 100);
 
         // Enter key để submit
-        document.getElementById('nicknameInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.saveNickname();
-            }
-        });
+        const nicknameInput = document.getElementById('nicknameInput');
+        if (nicknameInput) {
+            nicknameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.saveNickname();
+                }
+            });
+        }
     }
 
     // ============================================
     // LƯU NICKNAME
     // ============================================
     async saveNickname() {
-        const nickname = document.getElementById('nicknameInput').value.trim();
+        const nicknameInput = document.getElementById('nicknameInput');
+        if (!nicknameInput) {
+            alert('❌ Lỗi: Không tìm thấy input!');
+            return;
+        }
+        
+        const nickname = nicknameInput.value.trim();
         
         if (!nickname) {
             alert('⚠️ Vui lòng nhập tên hiển thị!');
-            document.getElementById('nicknameInput').focus();
+            nicknameInput.focus();
             return;
         }
 
         if (nickname.length < 2) {
             alert('⚠️ Tên hiển thị phải có ít nhất 2 ký tự!');
-            document.getElementById('nicknameInput').focus();
+            nicknameInput.focus();
             return;
         }
 
         if (nickname.length > 30) {
             alert('⚠️ Tên hiển thị không được quá 30 ký tự!');
-            document.getElementById('nicknameInput').focus();
+            nicknameInput.focus();
             return;
         }
 
@@ -227,7 +403,7 @@ class AuthManager {
 
                 if (!isOwnNickname) {
                     alert('⚠️ Tên hiển thị này đã được sử dụng! Vui lòng chọn tên khác.');
-                    document.getElementById('nicknameInput').focus();
+                    nicknameInput.focus();
                     return;
                 }
             }
@@ -374,6 +550,8 @@ class AuthManager {
     // ============================================
     addChangeNameButton() {
         const userInfo = document.getElementById('userInfo');
+        if (!userInfo) return;
+        
         let changeBtn = document.getElementById('changeNameBtn');
         
         if (!changeBtn) {
@@ -420,21 +598,28 @@ class AuthManager {
         document.body.appendChild(modalContainer.firstElementChild);
 
         setTimeout(() => {
-            document.getElementById('newNicknameInput').focus();
+            const input = document.getElementById('newNicknameInput');
+            if (input) input.focus();
         }, 100);
 
-        document.getElementById('newNicknameInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.confirmChangeName();
-            }
-        });
+        const newNicknameInput = document.getElementById('newNicknameInput');
+        if (newNicknameInput) {
+            newNicknameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.confirmChangeName();
+                }
+            });
+        }
     }
 
     // ============================================
     // XÁC NHẬN ĐỔI TÊN
     // ============================================
     async confirmChangeName() {
-        const newName = document.getElementById('newNicknameInput').value.trim();
+        const input = document.getElementById('newNicknameInput');
+        if (!input) return;
+        
+        const newName = input.value.trim();
         if (!newName) {
             alert('⚠️ Vui lòng nhập tên mới!');
             return;
@@ -451,13 +636,18 @@ class AuthManager {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
         
-        userInfo.style.display = 'none';
-        loginSection.style.display = 'block';
-        document.getElementById('welcomeMessage').style.display = 'none';
+        if (userInfo) userInfo.style.display = 'none';
+        if (loginSection) loginSection.style.display = 'block';
+        
+        const welcomeMsg = document.getElementById('welcomeMessage');
+        if (welcomeMsg) welcomeMsg.style.display = 'none';
         
         // Ẩn nút admin khi chưa đăng nhập
-        document.getElementById('adminLink').style.display = 'none';
-        document.getElementById('historyLink').style.display = 'none';
+        const adminLink = document.getElementById('adminLink');
+        if (adminLink) adminLink.style.display = 'none';
+        
+        const historyLink = document.getElementById('historyLink');
+        if (historyLink) historyLink.style.display = 'none';
         
         this.enablePrediction(false);
     }
@@ -466,13 +656,21 @@ class AuthManager {
     // CÁC HÀM KHÁC
     // ============================================
     resetForms() {
-        document.getElementById('emailLoginForm').style.display = 'none';
-        document.getElementById('registerForm').style.display = 'none';
-        document.getElementById('loginEmail').value = '';
-        document.getElementById('loginPassword').value = '';
-        document.getElementById('registerName').value = '';
-        document.getElementById('registerEmail').value = '';
-        document.getElementById('registerPassword').value = '';
+        const emailForm = document.getElementById('emailLoginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginEmail = document.getElementById('loginEmail');
+        const loginPassword = document.getElementById('loginPassword');
+        const registerName = document.getElementById('registerName');
+        const registerEmail = document.getElementById('registerEmail');
+        const registerPassword = document.getElementById('registerPassword');
+        
+        if (emailForm) emailForm.style.display = 'none';
+        if (registerForm) registerForm.style.display = 'none';
+        if (loginEmail) loginEmail.value = '';
+        if (loginPassword) loginPassword.value = '';
+        if (registerName) registerName.value = '';
+        if (registerEmail) registerEmail.value = '';
+        if (registerPassword) registerPassword.value = '';
         
         const passwordInputs = document.querySelectorAll('.password-wrapper input[type="password"]');
         passwordInputs.forEach(input => {
@@ -506,8 +704,16 @@ class AuthManager {
     }
 
     async loginWithEmail() {
-        const email = document.getElementById('loginEmail').value.trim();
-        const password = document.getElementById('loginPassword').value;
+        const emailInput = document.getElementById('loginEmail');
+        const passwordInput = document.getElementById('loginPassword');
+        
+        if (!emailInput || !passwordInput) {
+            alert('⚠️ Lỗi: Không tìm thấy form đăng nhập!');
+            return;
+        }
+        
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
         
         if (!email || !password) {
             alert('⚠️ Vui lòng nhập email và mật khẩu!');
@@ -535,9 +741,18 @@ class AuthManager {
     }
 
     async register() {
-        const name = document.getElementById('registerName').value.trim();
-        const email = document.getElementById('registerEmail').value.trim();
-        const password = document.getElementById('registerPassword').value;
+        const nameInput = document.getElementById('registerName');
+        const emailInput = document.getElementById('registerEmail');
+        const passwordInput = document.getElementById('registerPassword');
+        
+        if (!nameInput || !emailInput || !passwordInput) {
+            alert('⚠️ Lỗi: Không tìm thấy form đăng ký!');
+            return;
+        }
+        
+        const name = nameInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
         
         if (!name || !email || !password) {
             alert('⚠️ Vui lòng nhập đầy đủ thông tin!');
@@ -574,14 +789,20 @@ class AuthManager {
 
     showLoginModal() {
         const modal = document.getElementById('loginModal');
-        modal.style.display = 'block';
-        this.resetForms();
-        document.getElementById('emailLoginForm').style.display = 'block';
+        if (modal) {
+            modal.style.display = 'block';
+            this.resetForms();
+            const emailForm = document.getElementById('emailLoginForm');
+            if (emailForm) emailForm.style.display = 'block';
+        }
     }
 
     closeModal() {
-        document.getElementById('loginModal').style.display = 'none';
-        this.resetForms();
+        const modal = document.getElementById('loginModal');
+        if (modal) {
+            modal.style.display = 'none';
+            this.resetForms();
+        }
     }
 
     enablePrediction(enable) {
@@ -629,4 +850,28 @@ class AuthManager {
 }
 
 // Khởi tạo Auth Manager
-const authManager = new AuthManager();
+let authManager;
+
+// Đợi DOM load xong mới khởi tạo
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        authManager = new AuthManager();
+        window.authManager = authManager;
+        console.log('✅ AuthManager initialized (DOM ready)');
+    } catch (error) {
+        console.error('❌ Lỗi khởi tạo AuthManager:', error);
+    }
+});
+
+// Nếu DOM đã load, khởi tạo ngay
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    try {
+        authManager = new AuthManager();
+        window.authManager = authManager;
+        console.log('✅ AuthManager initialized (immediate)');
+    } catch (error) {
+        console.error('❌ Lỗi khởi tạo AuthManager:', error);
+    }
+}
+
+console.log('📄 auth.js loaded');

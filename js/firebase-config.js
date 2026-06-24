@@ -11,7 +11,10 @@ const firebaseConfig = {
 };
 
 // Khởi tạo Firebase
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+    console.log('✅ Firebase initialized');
+}
 
 // Khởi tạo các services
 const auth = firebase.auth();
@@ -19,12 +22,15 @@ const db = firebase.firestore();
 
 // Cấu hình Firestore settings (quan trọng)
 db.settings({
-    timestampsInSnapshots: true,
-    merge: true
+    timestampsInSnapshots: true
 });
 
-// Export để sử dụng ở các file khác
-// (Nếu dùng module, bỏ comment dòng dưới)
-// export { auth, db };
+// Set persistence
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(() => console.log('✅ Auth persistence set'))
+    .catch(error => console.error('❌ Auth persistence error:', error));
 
+// Export ra window
+window.auth = auth;
+window.db = db;
 console.log('✅ Firebase initialized successfully!');

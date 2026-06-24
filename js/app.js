@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Lưu instance để sử dụng sau
         window.matchManager = matchManager;
+        window.predictionManager = predictionManager;
+        window.statisticsManager = statsManager;
         
         console.log('✅ All managers initialized');
     } catch (error) {

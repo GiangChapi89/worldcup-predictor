@@ -1,0 +1,45 @@
+<!-- debug.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug - World Cup Predictor</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <h1>🔍 Debug Page</h1>
+    <div id="status">Loading...</div>
+    <button onclick="checkAuth()">Check Auth</button>
+    <button onclick="testLogin()">Test Login</button>
+
+    <script src="js/firebase-config.js"></script>
+    <script>
+        function checkAuth() {
+            const status = document.getElementById('status');
+            const user = firebase.auth().currentUser;
+            
+            status.innerHTML = `
+                <h3>Auth Status</h3>
+                <p>User: ${user ? user.email : 'Not logged in'}</p>
+                <p>Auth object: ${typeof auth}</p>
+                <p>DB object: ${typeof db}</p>
+                <p>Firebase initialized: ${firebase.apps.length > 0}</p>
+            `;
+        }
+
+        async function testLogin() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await firebase.auth().signInWithPopup(provider);
+                alert('✅ Login success: ' + result.user.email);
+                checkAuth();
+            } catch (error) {
+                alert('❌ Login failed: ' + error.message);
+            }
+        }
+
+        window.onload = checkAuth;
+    </script>
+</body>
+</html>
