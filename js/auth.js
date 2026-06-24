@@ -703,6 +703,8 @@ class AuthManager {
         }
     }
 
+    // js/auth.js - CẬP NHẬT HÀM loginWithEmail
+
     async loginWithEmail() {
         const emailInput = document.getElementById('loginEmail');
         const passwordInput = document.getElementById('loginPassword');
@@ -720,7 +722,20 @@ class AuthManager {
             return;
         }
 
+        // Kiểm tra mật khẩu tối thiểu
+        if (password.length < 6) {
+            alert('⚠️ Mật khẩu phải có ít nhất 6 ký tự!');
+            return;
+        }
+
         try {
+            // Hiển thị loading
+            const submitBtn = document.getElementById('submitLogin');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Đang đăng nhập...';
+            }
+            
             await auth.signInWithEmailAndPassword(email, password);
             console.log('✅ Đăng nhập Email thành công:', email);
             this.closeModal();
@@ -731,12 +746,22 @@ class AuthManager {
                 message += 'Email chưa được đăng ký. Vui lòng đăng ký tài khoản.';
             } else if (error.code === 'auth/wrong-password') {
                 message += 'Mật khẩu không đúng. Vui lòng thử lại.';
+            } else if (error.code === 'auth/invalid-credential') {
+                message += 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
             } else if (error.code === 'auth/too-many-requests') {
                 message += 'Quá nhiều lần thử sai. Vui lòng thử lại sau.';
+            } else if (error.code === 'auth/network-request-failed') {
+                message += 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
             } else {
                 message += error.message;
             }
             alert('❌ ' + message);
+        } finally {
+            const submitBtn = document.getElementById('submitLogin');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Đăng Nhập';
+            }
         }
     }
 
@@ -846,6 +871,52 @@ class AuthManager {
         } catch (error) {
             console.error('❌ Lỗi đăng xuất:', error);
         }
+    }
+
+    // js/auth.js - THÊM HÀM RESET MẬT KHẨU
+
+    async resetPassword() {
+        const emailInput = document.getElementById('loginEmail');
+        if (!emailInput) {
+            alert('⚠️ Vui lòng nhập email!');
+            return;
+        }
+        
+        const email = emailInput.value.trim();
+        if (!email) {
+            alert('⚠️ Vui lòng nhập email để reset mật khẩu!');
+            return;
+        }
+        
+        if (!confirm(`Bạn có chắc muốn gửi email reset mật khẩu đến ${email}?`)) {
+            return;
+        }
+        
+        try {
+            await auth.sendPasswordResetEmail(email);
+            alert(`✅ Đã gửi email reset mật khẩu đến ${email}.\nVui lòng kiểm tra hộp thư (cả spam).`);
+        } catch (error) {
+            console.error('❌ Lỗi reset mật khẩu:', error);
+            let message = 'Lỗi reset mật khẩu: ';
+            if (error.code === 'auth/user-not-found') {
+                message += 'Email chưa được đăng ký.';
+            } else if (error.code === 'auth/network-request-failed') {
+                message += 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.';
+            } else {
+                message += error.message;
+            }
+            alert('❌ ' + message);
+        }
+    }
+
+    // Thêm event listener cho nút Quên mật khẩu
+    // Trong initAuth():
+    const forgotPasswordLink = document.getElementById('forgotPassword');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.resetPassword();
+        });
     }
 }
 
