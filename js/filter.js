@@ -295,11 +295,12 @@ function renderSchedule(matches) {
 // ============================================
 // KẾT QUẢ
 // ============================================
+// js/filter.js - SỬA HÀM loadResults
+
 async function loadResults() {
     const container = document.getElementById('resultList');
     if (!container) return;
 
-    // Hiển thị trạng thái đang tải
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
 
     try {
@@ -310,8 +311,12 @@ async function loadResults() {
             .get();
 
         if (snapshot.empty) {
-            // Hiển thị thông báo khi chưa có kết quả
-            container.innerHTML = '<div class="no-results"><div class="icon">📭</div><p>Chưa có kết quả trận đấu nào</p></div>';
+            container.innerHTML = `
+                <div class="no-results">
+                    <div class="icon">📭</div>
+                    <p>Chưa có kết quả trận đấu nào</p>
+                </div>
+            `;
             return;
         }
 
@@ -325,22 +330,29 @@ async function loadResults() {
     } catch (error) {
         console.error('❌ Lỗi load results:', error);
         
-        // Kiểm tra nếu lỗi là do thiếu index
+        // Kiểm tra lỗi index
         if (error.message && error.message.includes('index')) {
+            // Lấy link từ error message
+            const indexLink = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+            
             container.innerHTML = `
-                <div class="no-results">
-                    <div class="icon">⚠️</div>
-                    <p>Đang cấu hình cơ sở dữ liệu. Vui lòng thử lại sau vài phút.</p>
-                    <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">
-                        <a href="${error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0] || '#'}" 
-                           target="_blank" style="color: #667eea;">
-                           Nhấn vào đây để tạo index
-                        </a>
+                <div class="no-results" style="padding: 30px; text-align: center;">
+                    <div class="icon" style="font-size: 48px; margin-bottom: 15px;">🔧</div>
+                    <h3 style="color: #2d3436; margin-bottom: 10px;">Đang cấu hình cơ sở dữ liệu</h3>
+                    <p style="color: #666; margin-bottom: 15px;">
+                        Hệ thống đang tạo chỉ mục để hiển thị kết quả. Vui lòng thử lại sau vài phút.
+                    </p>
+                    <a href="${indexLink || '#'}" 
+                       target="_blank" 
+                       style="display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                        📊 Tạo chỉ mục
+                    </a>
+                    <p style="color: #999; font-size: 12px; margin-top: 10px;">
+                        Nhấn vào nút trên để tạo chỉ mục, sau đó tải lại trang
                     </p>
                 </div>
             `;
         } else {
-            // Hiển thị lỗi chung
             container.innerHTML = `<p style="color:red; text-align:center; padding: 20px;">❌ Lỗi: ${error.message}</p>`;
         }
     }
@@ -405,10 +417,41 @@ async function loadMyPredictions() {
     
     try {
         const db = firebase.firestore();
-        const snapshot = await db.collection('user_predictions_history')
-            .where('userId', '==', user.uid)
-            .orderBy('createdAt', 'desc')
-            .get();
+        
+        // ⚠️ THỬ LẤY DỮ LIỆU VỚI ORDER BY
+        let snapshot;
+        try {
+            snapshot = await db.collection('user_predictions_history')
+                .where('userId', '==', user.uid)
+                .orderBy('createdAt', 'desc')
+                .get();
+        } catch (orderError) {
+            // Nếu lỗi do thiếu index, thử lấy không orderBy
+            if (orderError.message && orderError.message.includes('index')) {
+                console.warn('⚠️ Thiếu index, đang lấy dữ liệu không sắp xếp...');
+                snapshot = await db.collection('user_predictions_history')
+                    .where('userId', '==', user.uid)
+                    .get();
+                
+                // Sắp xếp thủ công trong JavaScript
+                const docs = [];
+                snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+                docs.sort((a, b) => {
+                    const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+                    const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+                    return timeB - timeA;
+                });
+                
+                // Tạo snapshot giả để render
+                const fakeSnapshot = {
+                    empty: docs.length === 0,
+                    forEach: (callback) => docs.forEach(d => callback({ id: d.id, data: () => d }))
+                };
+                snapshot = fakeSnapshot;
+            } else {
+                throw orderError;
+            }
+        }
         
         if (snapshot.empty) {
             container.innerHTML = `
@@ -424,11 +467,13 @@ async function loadMyPredictions() {
         let html = '';
         let totalPoints = 0;
         let correctCount = 0;
+        let totalPredictions = 0;
         
         snapshot.forEach(doc => {
             const pred = doc.data();
             totalPoints += pred.points || 0;
             if (pred.isCorrect) correctCount++;
+            totalPredictions++;
             
             const isCorrect = pred.isCorrect;
             
@@ -446,6 +491,22 @@ async function loadMyPredictions() {
                 }
             }
             
+            // Xác định trạng thái dự đoán
+            let statusText = '';
+            let statusColor = '';
+            if (pred.isProcessed !== undefined) {
+                if (pred.isCorrect) {
+                    statusText = '✅ Đúng';
+                    statusColor = '#28a745';
+                } else {
+                    statusText = '❌ Sai';
+                    statusColor = '#dc3545';
+                }
+            } else {
+                statusText = '⏳ Chờ xử lý';
+                statusColor = '#ffc107';
+            }
+            
             html += `
                 <div class="result-item" style="border-left-color: ${isCorrect ? '#28a745' : '#dc3545'}">
                     <div class="match-info">
@@ -453,21 +514,21 @@ async function loadMyPredictions() {
                         <div class="match-meta">
                             📅 ${pred.matchDate || 'N/A'} | ⚡ Kèo: ${pred.userHandicap || 0}
                             ${groupDisplay ? ` | ${groupDisplay}` : ''}
+                            <span style="margin-left: 10px; color: ${statusColor}; font-weight: 600;">${statusText}</span>
                         </div>
                         <div class="match-prediction">
                             Dự đoán: ${pred.predictedHomeScore} - ${pred.predictedAwayScore} | 
-                            Kết quả: ${pred.actualHomeScore} - ${pred.actualAwayScore}
+                            Kết quả: ${pred.actualHomeScore !== undefined ? pred.actualHomeScore : '?'} - ${pred.actualAwayScore !== undefined ? pred.actualAwayScore : '?'}
                             <span class="${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✅ Đúng' : '❌ Sai'}</span>
                         </div>
                     </div>
                     <div class="match-score ${isCorrect ? 'win' : 'lose'}">
-                        ${isCorrect ? '+1' : '0'} điểm
+                        ${pred.points || 0} điểm
                     </div>
                 </div>
             `;
         });
         
-        const totalPredictions = snapshot.size;
         const accuracy = totalPredictions > 0 ? Math.round((correctCount / totalPredictions) * 100) : 0;
         
         html = `
@@ -496,7 +557,31 @@ async function loadMyPredictions() {
         
     } catch (error) {
         console.error('❌ Lỗi load predictions:', error);
-        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+        
+        // Kiểm tra lỗi index
+        if (error.message && error.message.includes('index')) {
+            const indexLink = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+            
+            container.innerHTML = `
+                <div class="no-results" style="padding: 30px; text-align: center;">
+                    <div class="icon" style="font-size: 48px; margin-bottom: 15px;">🔧</div>
+                    <h3 style="color: #2d3436; margin-bottom: 10px;">Đang cấu hình cơ sở dữ liệu</h3>
+                    <p style="color: #666; margin-bottom: 15px;">
+                        Hệ thống đang tạo chỉ mục để hiển thị lịch sử dự đoán. Vui lòng thử lại sau vài phút.
+                    </p>
+                    <a href="${indexLink || '#'}" 
+                       target="_blank" 
+                       style="display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                        📊 Tạo chỉ mục
+                    </a>
+                    <p style="color: #999; font-size: 12px; margin-top: 10px;">
+                        Nhấn vào nút trên để tạo chỉ mục, sau đó tải lại trang
+                    </p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `<p style="color:red; text-align:center; padding: 20px;">❌ Lỗi: ${error.message}</p>`;
+        }
     }
 }
 
@@ -574,6 +659,43 @@ function resetResultFilters() {
     document.getElementById('resultTeamFilter').value = 'all';
     renderResults(allResults);
 }
+
+// js/filter.js - THÊM HÀM XỬ LÝ LỖI INDEX
+
+// ============================================
+// XỬ LÝ LỖI INDEX CHUNG
+// ============================================
+function handleIndexError(error, container, title = 'Đang cấu hình cơ sở dữ liệu') {
+    console.error('❌ Lỗi:', error);
+    
+    if (error.message && error.message.includes('index')) {
+        const indexLink = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+        
+        container.innerHTML = `
+            <div class="no-results" style="padding: 30px; text-align: center;">
+                <div class="icon" style="font-size: 48px; margin-bottom: 15px;">🔧</div>
+                <h3 style="color: #2d3436; margin-bottom: 10px;">${title}</h3>
+                <p style="color: #666; margin-bottom: 15px;">
+                    Hệ thống đang tạo chỉ mục để hiển thị dữ liệu. Vui lòng thử lại sau vài phút.
+                </p>
+                <a href="${indexLink || '#'}" 
+                   target="_blank" 
+                   style="display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                    📊 Tạo chỉ mục
+                </a>
+                <p style="color: #999; font-size: 12px; margin-top: 10px;">
+                    Nhấn vào nút trên để tạo chỉ mục, sau đó tải lại trang
+                </p>
+            </div>
+        `;
+        return true;
+    }
+    return false;
+}
+
+// Sử dụng trong loadResults và loadMyPredictions
+// Ví dụ: trong catch của loadResults
+// if (handleIndexError(error, container, 'Đang cấu hình để hiển thị kết quả')) return;
 
 // Export các hàm ra global
 window.loadSchedule = loadSchedule;
