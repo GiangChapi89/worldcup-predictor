@@ -663,6 +663,45 @@
                 <button onclick="manualCalculatePoints()" class="btn-info">🧮 Tính điểm thủ công</button>
                 <button onclick="calculateAllMatches()" class="btn-warning">📊 Tính tất cả</button>
                 <button onclick="resetMatchPoints()" class="btn-danger">🔄 Reset điểm</button>
+                <button onclick="resetSystem()" class="btn-reset-system">🗑️ Reset Hệ Thống</button>
+            </div>
+
+            <!-- ===== BỘ LỌC ===== -->
+            <div class="filter-section" id="adminFilterSection">
+                <label>📅 Theo ngày:</label>
+                <input type="date" id="adminDateFilter">
+                
+                <label>🏆 Theo bảng:</label>
+                <select id="adminGroupFilter">
+                    <option value="all">Tất cả bảng</option>
+                    <option value="Group A">Group A</option>
+                    <option value="Group B">Group B</option>
+                    <option value="Group C">Group C</option>
+                    <option value="Group D">Group D</option>
+                    <option value="Group E">Group E</option>
+                    <option value="Group F">Group F</option>
+                    <option value="Group G">Group G</option>
+                    <option value="Group H">Group H</option>
+                    <option value="Group I">Group I</option>
+                    <option value="Group J">Group J</option>
+                    <option value="Group K">Group K</option>
+                    <option value="Group L">Group L</option>
+                </select>
+                
+                <label>🏷️ Theo đội:</label>
+                <select id="adminTeamFilter">
+                    <option value="all">Tất cả đội</option>
+                </select>
+                
+                <label>📊 Trạng thái:</label>
+                <select id="adminStatusFilter">
+                    <option value="all">Tất cả</option>
+                    <option value="upcoming">⏳ Sắp diễn ra</option>
+                    <option value="finished">✅ Đã kết thúc</option>
+                </select>
+                
+                <button class="filter-btn" onclick="applyAdminFilters()">🔍 Lọc</button>
+                <button class="filter-btn reset" onclick="resetAdminFilters()">🔄 Reset</button>
             </div>
             
             <!-- Form Thêm/Sửa Trận Đấu -->

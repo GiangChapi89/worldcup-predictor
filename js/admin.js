@@ -1,4 +1,4 @@
-// js/admin.js - HOÀN CHỈNH
+// js/admin.js - HOÀN CHỈNH VỚI BỘ LỌC
 
 // ============================================
 // DANH SÁCH ADMIN EMAIL (SUPER ADMIN)
@@ -7,6 +7,12 @@ const SUPER_ADMIN_EMAILS = [
     'songdaytronglong@gmail.com',
     'admin@gmail.com'
 ];
+
+// ============================================
+// BIẾN TOÀN CỤC CHO ADMIN FILTER
+// ============================================
+let adminAllMatches = [];
+let adminTeams = [];
 
 // ============================================
 // KIỂM TRA QUYỀN ADMIN TỪ FIRESTORE
@@ -111,6 +117,95 @@ async function loadRecentActivity() {
 }
 
 // ============================================
+// LOAD TEAMS CHO ADMIN FILTER
+// ============================================
+async function loadAdminTeams() {
+    try {
+        const db = firebase.firestore();
+        const snapshot = await db.collection('matches').get();
+        
+        const teams = new Set();
+        snapshot.forEach(doc => {
+            const match = doc.data();
+            if (match.homeTeam) teams.add(match.homeTeam);
+            if (match.awayTeam) teams.add(match.awayTeam);
+        });
+        
+        // Nếu không có dữ liệu từ Firestore, dùng GROUPS_DATA
+        if (teams.size === 0 && typeof GROUPS_DATA !== 'undefined') {
+            Object.values(GROUPS_DATA).forEach(group => {
+                group.teams.forEach(team => {
+                    teams.add(team);
+                });
+            });
+        }
+        
+        adminTeams = Array.from(teams).sort();
+        populateAdminTeamDropdown(adminTeams);
+        
+        console.log('✅ Admin teams loaded:', adminTeams.length);
+        
+    } catch (error) {
+        console.error('❌ Lỗi load admin teams:', error);
+        // Fallback
+        if (typeof GROUPS_DATA !== 'undefined') {
+            const teams = new Set();
+            Object.values(GROUPS_DATA).forEach(group => {
+                group.teams.forEach(team => {
+                    teams.add(team);
+                });
+            });
+            adminTeams = Array.from(teams).sort();
+            populateAdminTeamDropdown(adminTeams);
+        }
+    }
+}
+
+function populateAdminTeamDropdown(teams) {
+    const select = document.getElementById('adminTeamFilter');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    const allOption = document.createElement('option');
+    allOption.value = 'all';
+    allOption.textContent = '🏷️ Tất cả đội';
+    select.appendChild(allOption);
+    
+    // Nhóm các đội theo bảng
+    if (typeof TEAM_TO_GROUP !== 'undefined') {
+        const groupedTeams = {};
+        teams.forEach(team => {
+            const group = TEAM_TO_GROUP[team] || 'Khác';
+            if (!groupedTeams[group]) {
+                groupedTeams[group] = [];
+            }
+            groupedTeams[group].push(team);
+        });
+        
+        const sortedGroups = Object.keys(groupedTeams).sort();
+        sortedGroups.forEach(group => {
+            const optGroup = document.createElement('optgroup');
+            optGroup.label = '🏆 ' + group;
+            
+            groupedTeams[group].sort().forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                optGroup.appendChild(option);
+            });
+            select.appendChild(optGroup);
+        });
+    } else {
+        teams.forEach(team => {
+            const option = document.createElement('option');
+            option.value = team;
+            option.textContent = team;
+            select.appendChild(option);
+        });
+    }
+}
+
+// ============================================
 // HÀM LOAD MATCHES
 // ============================================
 async function loadMatches() {
@@ -132,15 +227,52 @@ async function loadMatches() {
         
         console.log('📦 Matches found:', snapshot.size);
         
-        if (snapshot.empty) {
-            container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Chưa có trận đấu nào</p>';
-            return;
-        }
-        
-        let html = '<div class="match-grid">';
+        // Lưu tất cả dữ liệu
+        adminAllMatches = [];
         snapshot.forEach(doc => {
-            const match = doc.data();
-            const id = doc.id;
+            adminAllMatches.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Load teams cho dropdown
+        await loadAdminTeams();
+        
+        renderAdminMatches(adminAllMatches);
+        
+    } catch (error) {
+        console.error('❌ Lỗi load matches:', error);
+        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+    }
+}
+
+// ============================================
+// RENDER ADMIN MATCHES
+// ============================================
+function renderAdminMatches(matches) {
+    const container = document.getElementById('matchListAdmin');
+    if (!container) return;
+    
+    if (!matches || matches.length === 0) {
+        container.innerHTML = '<p style="text-align:center;padding:20px;color:#888;">📭 Không tìm thấy trận đấu nào</p>';
+        return;
+    }
+    
+    // Nhóm theo ngày
+    const grouped = {};
+    matches.forEach(match => {
+        const date = match.date || 'Chưa có ngày';
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(match);
+    });
+    
+    let html = '';
+    const sortedDates = Object.keys(grouped).sort();
+    
+    sortedDates.forEach(date => {
+        html += `<div class="group-section">`;
+        html += `<div class="group-header"><span class="group-title">📅 ${date}</span><span class="group-count">${grouped[date].length} trận</span></div>`;
+        html += `<div class="match-grid">`;
+        
+        grouped[date].forEach(match => {
             const isFinished = match.status === 'finished';
             const statusClass = isFinished ? 'finished' : 'upcoming';
             
@@ -153,7 +285,6 @@ async function loadMatches() {
                         <span class="match-status-badge ${statusClass}">${isFinished ? '✅ Đã kết thúc' : '⏳ Sắp diễn ra'}</span>
                     </div>
                     <div class="match-details">
-                        <span>📅 ${match.date || 'N/A'}</span>
                         <span>⏰ ${match.time || 'N/A'}</span>
                         <span>⚡ ${match.handicap || 0}</span>
                         <span>🏆 ${match.group || 'N/A'}</span>
@@ -164,26 +295,63 @@ async function loadMatches() {
                             '⏳ Chưa diễn ra'}
                     </div>
                     <div class="match-actions">
-                        <button onclick="editMatch('${id}')" class="btn-secondary btn-sm">✏️ Sửa</button>
+                        <button onclick="editMatch('${match.id}')" class="btn-secondary btn-sm">✏️ Sửa</button>
                         ${!isFinished ? `
-                            <button onclick="showResultForm('${id}')" class="btn-success btn-sm">📝 Nhập kết quả</button>
+                            <button onclick="showResultForm('${match.id}')" class="btn-success btn-sm">📝 Nhập kết quả</button>
                         ` : `
-                            <button onclick="viewMatchResult('${id}')" class="btn-info btn-sm">📊 Xem kết quả</button>
-                            <button onclick="deleteMatchResult('${id}')" class="btn-danger btn-sm">🗑️ Xóa kết quả</button>
+                            <button onclick="viewMatchResult('${match.id}')" class="btn-info btn-sm">📊 Xem kết quả</button>
+                            <button onclick="deleteMatchResult('${match.id}')" class="btn-danger btn-sm">🗑️ Xóa kết quả</button>
                         `}
-                        <button onclick="deleteMatch('${id}')" class="btn-danger btn-sm">🗑️ Xóa</button>
+                        <button onclick="deleteMatch('${match.id}')" class="btn-danger btn-sm">🗑️ Xóa</button>
                     </div>
                 </div>
             `;
         });
-        html += '</div>';
-        container.innerHTML = html;
-        console.log('✅ Matches rendered successfully');
         
-    } catch (error) {
-        console.error('❌ Lỗi load matches:', error);
-        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+        html += `</div></div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+// ============================================
+// HÀM LỌC ADMIN
+// ============================================
+function applyAdminFilters() {
+    const dateFilter = document.getElementById('adminDateFilter').value;
+    const groupFilter = document.getElementById('adminGroupFilter').value;
+    const teamFilter = document.getElementById('adminTeamFilter').value;
+    const statusFilter = document.getElementById('adminStatusFilter').value;
+    
+    console.log('🔍 Áp dụng lọc admin:', { dateFilter, groupFilter, teamFilter, statusFilter });
+    
+    let filtered = [...adminAllMatches];
+    
+    if (dateFilter) {
+        filtered = filtered.filter(m => m.date === dateFilter);
     }
+    
+    if (groupFilter !== 'all') {
+        filtered = filtered.filter(m => m.group === groupFilter);
+    }
+    
+    if (teamFilter !== 'all') {
+        filtered = filtered.filter(m => m.homeTeam === teamFilter || m.awayTeam === teamFilter);
+    }
+    
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(m => m.status === statusFilter);
+    }
+    
+    renderAdminMatches(filtered);
+}
+
+function resetAdminFilters() {
+    document.getElementById('adminDateFilter').value = '';
+    document.getElementById('adminGroupFilter').value = 'all';
+    document.getElementById('adminTeamFilter').value = 'all';
+    document.getElementById('adminStatusFilter').value = 'all';
+    renderAdminMatches(adminAllMatches);
 }
 
 // ============================================
@@ -1387,6 +1555,9 @@ window.approveAdmin = approveAdmin;
 window.revokeAdmin = revokeAdmin;
 window.exportUsers = exportUsers;
 window.checkAdmin = checkAdmin;
+window.applyAdminFilters = applyAdminFilters;
+window.resetAdminFilters = resetAdminFilters;
+window.loadAdminTeams = loadAdminTeams;
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 DOM ready, setting up tabs...');
@@ -1458,8 +1629,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadDashboard();
     }, 500);
 });
-
-// ============================================
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     console.log('📄 DOM already ready, checking admin...');
