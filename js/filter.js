@@ -1,11 +1,13 @@
 // js/filter.js
 let allMatches = [];
+let allResults = [];
 let allTeams = [];
 
 // ============================================
 // KHỞI TẠO
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 Initializing filters...');
     initSubTabs();
     loadTeamsForFilters();
 });
@@ -20,23 +22,29 @@ function initSubTabs() {
         btn.addEventListener('click', function() {
             const subTabId = this.dataset.subtab;
             
-            // Remove active từ tất cả
             subTabs.forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.subtab-content').forEach(c => c.classList.remove('active'));
             
-            // Add active
             this.classList.add('active');
             const content = document.getElementById('subtab-' + subTabId);
             if (content) {
                 content.classList.add('active');
             }
             
-            // Load dữ liệu tương ứng
+            // Ẩn tất cả bộ lọc
+            document.querySelectorAll('.filter-section').forEach(f => {
+                f.style.display = 'none';
+            });
+            
             switch(subTabId) {
                 case 'schedule':
+                    const scheduleFilter = document.getElementById('scheduleFilterSection');
+                    if (scheduleFilter) scheduleFilter.style.display = 'flex';
                     loadSchedule();
                     break;
                 case 'results':
+                    const resultFilter = document.getElementById('resultFilterSection');
+                    if (resultFilter) resultFilter.style.display = 'flex';
                     loadResults();
                     break;
                 case 'predictions':
@@ -46,8 +54,13 @@ function initSubTabs() {
         });
     });
     
-    // Mặc định load lịch thi đấu
-    setTimeout(loadSchedule, 500);
+    setTimeout(() => {
+        const scheduleFilter = document.getElementById('scheduleFilterSection');
+        if (scheduleFilter) scheduleFilter.style.display = 'flex';
+        const resultFilter = document.getElementById('resultFilterSection');
+        if (resultFilter) resultFilter.style.display = 'none';
+        loadSchedule();
+    }, 500);
 }
 
 // ============================================
@@ -65,14 +78,36 @@ async function loadTeamsForFilters() {
             if (match.awayTeam) teams.add(match.awayTeam);
         });
         
-        allTeams = Array.from(teams).sort();
+        if (teams.size === 0) {
+            console.log('📋 Không có dữ liệu từ Firestore, sử dụng GROUPS_DATA');
+            if (typeof GROUPS_DATA !== 'undefined') {
+                Object.values(GROUPS_DATA).forEach(group => {
+                    group.teams.forEach(team => {
+                        teams.add(team);
+                    });
+                });
+            }
+        }
         
-        // Populate dropdowns
+        allTeams = Array.from(teams).sort();
         populateTeamDropdown('scheduleTeamFilter', allTeams);
         populateTeamDropdown('resultTeamFilter', allTeams);
         
+        console.log('✅ Teams loaded:', allTeams.length);
+        
     } catch (error) {
         console.error('❌ Lỗi load teams:', error);
+        if (typeof GROUPS_DATA !== 'undefined') {
+            const teams = new Set();
+            Object.values(GROUPS_DATA).forEach(group => {
+                group.teams.forEach(team => {
+                    teams.add(team);
+                });
+            });
+            allTeams = Array.from(teams).sort();
+            populateTeamDropdown('scheduleTeamFilter', allTeams);
+            populateTeamDropdown('resultTeamFilter', allTeams);
+        }
     }
 }
 
@@ -80,17 +115,11 @@ function populateTeamDropdown(selectId, teams) {
     const select = document.getElementById(selectId);
     if (!select) return;
     
-    // Giữ option "Tất cả đội"
-    const allOption = select.querySelector('option[value="all"]');
     select.innerHTML = '';
-    if (allOption) {
-        select.appendChild(allOption);
-    } else {
-        const opt = document.createElement('option');
-        opt.value = 'all';
-        opt.textContent = 'Tất cả đội';
-        select.appendChild(opt);
-    }
+    const allOption = document.createElement('option');
+    allOption.value = 'all';
+    allOption.textContent = 'Tất cả đội';
+    select.appendChild(allOption);
     
     teams.forEach(team => {
         const option = document.createElement('option');
@@ -142,7 +171,6 @@ function renderSchedule(matches) {
         return;
     }
     
-    // Nhóm theo ngày
     const grouped = {};
     matches.forEach(match => {
         const date = match.date || 'Chưa có ngày';
@@ -217,12 +245,12 @@ async function loadResults() {
             return;
         }
         
-        const results = [];
+        allResults = [];
         snapshot.forEach(doc => {
-            results.push({ id: doc.id, ...doc.data() });
+            allResults.push({ id: doc.id, ...doc.data() });
         });
         
-        renderResults(results);
+        renderResults(allResults);
         
     } catch (error) {
         console.error('❌ Lỗi load results:', error);
@@ -336,7 +364,6 @@ async function loadMyPredictions() {
             `;
         });
         
-        // Thống kê
         const totalPredictions = snapshot.size;
         const accuracy = totalPredictions > 0 ? Math.round((correctCount / totalPredictions) * 100) : 0;
         
@@ -371,12 +398,14 @@ async function loadMyPredictions() {
 }
 
 // ============================================
-// BỘ LỌC LỊCH THI ĐẤU
+// BỘ LỌC
 // ============================================
 function applyScheduleFilters() {
     const dateFilter = document.getElementById('scheduleDateFilter').value;
     const groupFilter = document.getElementById('scheduleGroupFilter').value;
     const teamFilter = document.getElementById('scheduleTeamFilter').value;
+    
+    console.log('🔍 Áp dụng lọc:', { dateFilter, groupFilter, teamFilter });
     
     let filtered = [...allMatches];
     
@@ -402,17 +431,13 @@ function resetScheduleFilters() {
     renderSchedule(allMatches);
 }
 
-// ============================================
-// BỘ LỌC KẾT QUẢ
-// ============================================
-let allResults = [];
-
 async function applyResultFilters() {
     const dateFilter = document.getElementById('resultDateFilter').value;
     const groupFilter = document.getElementById('resultGroupFilter').value;
     const teamFilter = document.getElementById('resultTeamFilter').value;
     
-    // Load lại kết quả nếu chưa có
+    console.log('🔍 Áp dụng lọc kết quả:', { dateFilter, groupFilter, teamFilter });
+    
     if (allResults.length === 0) {
         const db = firebase.firestore();
         const snapshot = await db.collection('matches')
