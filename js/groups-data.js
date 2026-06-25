@@ -49,5 +49,14 @@ Object.values(GROUPS_DATA).forEach(group => {
 });
 ALL_TEAMS.sort();
 
+// Tạo mapping đội -> bảng
+const TEAM_TO_GROUP = {};
+Object.entries(GROUPS_DATA).forEach(([group, data]) => {
+    data.teams.forEach(team => {
+        TEAM_TO_GROUP[team] = group;
+    });
+});
+
 console.log('✅ Groups data loaded:', Object.keys(GROUPS_DATA).length, 'groups');
 console.log('✅ Teams loaded:', ALL_TEAMS.length, 'teams');
+console.log('✅ Team to group mapping loaded');

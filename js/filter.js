@@ -1,4 +1,5 @@
-// js/filter.js
+// js/filter.js - CẬP NHẬT VỚI TÌM KIẾM ĐỘI
+
 let allMatches = [];
 let allResults = [];
 let allTeams = [];
@@ -10,7 +11,29 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🔧 Initializing filters...');
     initSubTabs();
     loadTeamsForFilters();
+    setupTeamSearch();
 });
+
+// ============================================
+// SETUP TÌM KIẾM ĐỘI
+// ============================================
+function setupTeamSearch() {
+    // Tìm kiếm đội trong lịch thi đấu
+    const scheduleTeamFilter = document.getElementById('scheduleTeamFilter');
+    if (scheduleTeamFilter) {
+        scheduleTeamFilter.addEventListener('change', function() {
+            applyScheduleFilters();
+        });
+    }
+    
+    // Tìm kiếm đội trong kết quả
+    const resultTeamFilter = document.getElementById('resultTeamFilter');
+    if (resultTeamFilter) {
+        resultTeamFilter.addEventListener('change', function() {
+            applyResultFilters();
+        });
+    }
+}
 
 // ============================================
 // SUB TABS
@@ -78,6 +101,7 @@ async function loadTeamsForFilters() {
             if (match.awayTeam) teams.add(match.awayTeam);
         });
         
+        // Nếu không có dữ liệu từ Firestore, dùng dữ liệu từ GROUPS_DATA
         if (teams.size === 0) {
             console.log('📋 Không có dữ liệu từ Firestore, sử dụng GROUPS_DATA');
             if (typeof GROUPS_DATA !== 'undefined') {
@@ -97,6 +121,7 @@ async function loadTeamsForFilters() {
         
     } catch (error) {
         console.error('❌ Lỗi load teams:', error);
+        // Fallback: sử dụng GROUPS_DATA
         if (typeof GROUPS_DATA !== 'undefined') {
             const teams = new Set();
             Object.values(GROUPS_DATA).forEach(group => {
@@ -118,15 +143,45 @@ function populateTeamDropdown(selectId, teams) {
     select.innerHTML = '';
     const allOption = document.createElement('option');
     allOption.value = 'all';
-    allOption.textContent = 'Tất cả đội';
+    allOption.textContent = '🏷️ Tất cả đội';
     select.appendChild(allOption);
     
-    teams.forEach(team => {
-        const option = document.createElement('option');
-        option.value = team;
-        option.textContent = team;
-        select.appendChild(option);
-    });
+    // Nhóm các đội theo bảng
+    if (typeof TEAM_TO_GROUP !== 'undefined') {
+        // Nhóm theo bảng
+        const groupedTeams = {};
+        teams.forEach(team => {
+            const group = TEAM_TO_GROUP[team] || 'Khác';
+            if (!groupedTeams[group]) {
+                groupedTeams[group] = [];
+            }
+            groupedTeams[group].push(team);
+        });
+        
+        // Sắp xếp các bảng
+        const sortedGroups = Object.keys(groupedTeams).sort();
+        sortedGroups.forEach(group => {
+            // Thêm option group header
+            const optGroup = document.createElement('optgroup');
+            optGroup.label = '🏆 ' + group;
+            
+            groupedTeams[group].sort().forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                optGroup.appendChild(option);
+            });
+            select.appendChild(optGroup);
+        });
+    } else {
+        // Fallback: không nhóm
+        teams.forEach(team => {
+            const option = document.createElement('option');
+            option.value = team;
+            option.textContent = team;
+            select.appendChild(option);
+        });
+    }
 }
 
 // ============================================
@@ -171,6 +226,7 @@ function renderSchedule(matches) {
         return;
     }
     
+    // Nhóm theo ngày
     const grouped = {};
     matches.forEach(match => {
         const date = match.date || 'Chưa có ngày';
@@ -190,6 +246,21 @@ function renderSchedule(matches) {
             const isFinished = match.status === 'finished';
             const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
             
+            // Tìm bảng của đội
+            let groupDisplay = match.group || '';
+            if (!groupDisplay && typeof TEAM_TO_GROUP !== 'undefined') {
+                // Nếu trận đấu chưa có group, lấy từ mapping
+                const homeGroup = TEAM_TO_GROUP[match.homeTeam];
+                const awayGroup = TEAM_TO_GROUP[match.awayTeam];
+                if (homeGroup && homeGroup === awayGroup) {
+                    groupDisplay = homeGroup;
+                } else if (homeGroup) {
+                    groupDisplay = homeGroup;
+                } else if (awayGroup) {
+                    groupDisplay = awayGroup;
+                }
+            }
+            
             html += `
                 <div class="match-card">
                     <div class="match-info">
@@ -200,7 +271,7 @@ function renderSchedule(matches) {
                     <div class="match-details">
                         <span>⏰ ${match.time || 'N/A'}</span>
                         <span>${handicapDisplay}</span>
-                        <span>🏆 ${match.group || 'N/A'}</span>
+                        ${groupDisplay ? `<span>🏆 ${groupDisplay}</span>` : ''}
                     </div>
                     <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
                         ${isFinished ? `${match.homeScore} - ${match.awayScore} 🏆` : '⏳ Chưa diễn ra'}
@@ -344,12 +415,27 @@ async function loadMyPredictions() {
             
             const isCorrect = pred.isCorrect;
             
+            // Tìm bảng của đội
+            let groupDisplay = '';
+            if (typeof TEAM_TO_GROUP !== 'undefined') {
+                const homeGroup = TEAM_TO_GROUP[pred.homeTeam];
+                const awayGroup = TEAM_TO_GROUP[pred.awayTeam];
+                if (homeGroup && homeGroup === awayGroup) {
+                    groupDisplay = `🏆 ${homeGroup}`;
+                } else if (homeGroup) {
+                    groupDisplay = `🏆 ${homeGroup}`;
+                } else if (awayGroup) {
+                    groupDisplay = `🏆 ${awayGroup}`;
+                }
+            }
+            
             html += `
                 <div class="result-item" style="border-left-color: ${isCorrect ? '#28a745' : '#dc3545'}">
                     <div class="match-info">
                         <div class="match-teams">${pred.homeTeam || 'N/A'} vs ${pred.awayTeam || 'N/A'}</div>
                         <div class="match-meta">
                             📅 ${pred.matchDate || 'N/A'} | ⚡ Kèo: ${pred.userHandicap || 0}
+                            ${groupDisplay ? ` | ${groupDisplay}` : ''}
                         </div>
                         <div class="match-prediction">
                             Dự đoán: ${pred.predictedHomeScore} - ${pred.predictedAwayScore} | 
