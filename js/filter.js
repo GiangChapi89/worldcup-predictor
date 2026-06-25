@@ -91,37 +91,34 @@ function initSubTabs() {
 // ============================================
 async function loadTeamsForFilters() {
     try {
+        // Luôn bắt đầu với danh sách đội từ GROUPS_DATA
+        let allTeamsSet = new Set();
+        if (typeof GROUPS_DATA !== 'undefined') {
+            Object.values(GROUPS_DATA).forEach(group => {
+                group.teams.forEach(team => {
+                    allTeamsSet.add(team);
+                });
+            });
+        }
+
+        // (Tùy chọn) Bổ sung thêm các đội từ Firestore nếu có
         const db = firebase.firestore();
         const snapshot = await db.collection('matches').get();
-        
-        const teams = new Set();
         snapshot.forEach(doc => {
             const match = doc.data();
-            if (match.homeTeam) teams.add(match.homeTeam);
-            if (match.awayTeam) teams.add(match.awayTeam);
+            if (match.homeTeam) allTeamsSet.add(match.homeTeam);
+            if (match.awayTeam) allTeamsSet.add(match.awayTeam);
         });
-        
-        // Nếu không có dữ liệu từ Firestore, dùng dữ liệu từ GROUPS_DATA
-        if (teams.size === 0) {
-            console.log('📋 Không có dữ liệu từ Firestore, sử dụng GROUPS_DATA');
-            if (typeof GROUPS_DATA !== 'undefined') {
-                Object.values(GROUPS_DATA).forEach(group => {
-                    group.teams.forEach(team => {
-                        teams.add(team);
-                    });
-                });
-            }
-        }
-        
-        allTeams = Array.from(teams).sort();
+
+        // Cập nhật mảng allTeams và populate dropdown
+        allTeams = Array.from(allTeamsSet).sort();
         populateTeamDropdown('scheduleTeamFilter', allTeams);
         populateTeamDropdown('resultTeamFilter', allTeams);
-        
+
         console.log('✅ Teams loaded:', allTeams.length);
-        
     } catch (error) {
         console.error('❌ Lỗi load teams:', error);
-        // Fallback: sử dụng GROUPS_DATA
+        // Fallback an toàn: chỉ dùng GROUPS_DATA
         if (typeof GROUPS_DATA !== 'undefined') {
             const teams = new Set();
             Object.values(GROUPS_DATA).forEach(group => {
@@ -301,31 +298,51 @@ function renderSchedule(matches) {
 async function loadResults() {
     const container = document.getElementById('resultList');
     if (!container) return;
-    
+
+    // Hiển thị trạng thái đang tải
     container.innerHTML = '<div class="loading">⏳ Đang tải...</div>';
-    
+
     try {
         const db = firebase.firestore();
         const snapshot = await db.collection('matches')
             .where('status', '==', 'finished')
             .orderBy('date', 'desc')
             .get();
-        
+
         if (snapshot.empty) {
+            // Hiển thị thông báo khi chưa có kết quả
             container.innerHTML = '<div class="no-results"><div class="icon">📭</div><p>Chưa có kết quả trận đấu nào</p></div>';
             return;
         }
-        
+
         allResults = [];
         snapshot.forEach(doc => {
             allResults.push({ id: doc.id, ...doc.data() });
         });
-        
+
         renderResults(allResults);
-        
+
     } catch (error) {
         console.error('❌ Lỗi load results:', error);
-        container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+        
+        // Kiểm tra nếu lỗi là do thiếu index
+        if (error.message && error.message.includes('index')) {
+            container.innerHTML = `
+                <div class="no-results">
+                    <div class="icon">⚠️</div>
+                    <p>Đang cấu hình cơ sở dữ liệu. Vui lòng thử lại sau vài phút.</p>
+                    <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">
+                        <a href="${error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0] || '#'}" 
+                           target="_blank" style="color: #667eea;">
+                           Nhấn vào đây để tạo index
+                        </a>
+                    </p>
+                </div>
+            `;
+        } else {
+            // Hiển thị lỗi chung
+            container.innerHTML = `<p style="color:red; text-align:center; padding: 20px;">❌ Lỗi: ${error.message}</p>`;
+        }
     }
 }
 
