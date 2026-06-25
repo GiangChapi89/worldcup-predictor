@@ -7,7 +7,6 @@ class AuthManager {
     }
 
     initAuth() {
-        // Kiểm tra các element
         const elements = {
             loginBtn: document.getElementById('loginBtn'),
             logoutBtn: document.getElementById('logoutBtn'),
@@ -20,14 +19,12 @@ class AuthManager {
             forgotPassword: document.getElementById('forgotPassword')
         };
 
-        // Kiểm tra element
         for (const [key, element] of Object.entries(elements)) {
             if (!element) {
                 console.warn(`⚠️ Element #${key} not found`);
             }
         }
 
-        // Theo dõi trạng thái đăng nhập
         auth.onAuthStateChanged(async (user) => {
             console.log('🔔 Auth state changed:', user?.email || 'No user');
             
@@ -55,23 +52,16 @@ class AuthManager {
             }
         });
 
-        // ============================================
-        // CÁC SỰ KIỆN CLICK
-        // ============================================
-        
-        // Nút Đăng Nhập
         const loginBtn = document.getElementById('loginBtn');
         if (loginBtn) {
             loginBtn.addEventListener('click', () => this.showLoginModal());
         }
 
-        // Nút Đăng Xuất
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => this.logout());
         }
 
-        // Modal - Đóng khi click X
         const modal = document.getElementById('loginModal');
         const closeBtn = document.querySelector('.close');
         if (modal && closeBtn) {
@@ -87,13 +77,11 @@ class AuthManager {
             };
         }
 
-        // Đăng nhập Google
         const googleLoginBtn = document.getElementById('googleLogin');
         if (googleLoginBtn) {
             googleLoginBtn.addEventListener('click', () => this.loginWithGoogle());
         }
 
-        // Đăng nhập Email - Mở form email
         const emailLoginBtn = document.getElementById('emailLogin');
         if (emailLoginBtn) {
             emailLoginBtn.addEventListener('click', () => {
@@ -102,19 +90,16 @@ class AuthManager {
             });
         }
 
-        // Submit Login
         const submitLoginBtn = document.getElementById('submitLogin');
         if (submitLoginBtn) {
             submitLoginBtn.addEventListener('click', () => this.loginWithEmail());
         }
 
-        // Submit Register
         const submitRegisterBtn = document.getElementById('submitRegister');
         if (submitRegisterBtn) {
             submitRegisterBtn.addEventListener('click', () => this.register());
         }
 
-        // Switch to Register
         const switchToRegister = document.getElementById('switchToRegister');
         if (switchToRegister) {
             switchToRegister.addEventListener('click', (e) => {
@@ -124,7 +109,6 @@ class AuthManager {
             });
         }
 
-        // Switch to Login
         const switchToLogin = document.getElementById('switchToLogin');
         if (switchToLogin) {
             switchToLogin.addEventListener('click', (e) => {
@@ -134,7 +118,6 @@ class AuthManager {
             });
         }
 
-        // Quên mật khẩu
         const forgotPasswordLink = document.getElementById('forgotPassword');
         if (forgotPasswordLink) {
             forgotPasswordLink.addEventListener('click', (e) => {
@@ -143,7 +126,6 @@ class AuthManager {
             });
         }
 
-        // Enter key support
         const loginEmail = document.getElementById('loginEmail');
         const loginPassword = document.getElementById('loginPassword');
         const registerName = document.getElementById('registerName');
@@ -198,9 +180,6 @@ class AuthManager {
         console.log('✅ Auth events initialized');
     }
 
-    // ============================================
-    // LẮNG NGHE THAY ĐỔI QUYỀN ADMIN REAL-TIME
-    // ============================================
     listenAdminStatus(userId) {
         if (this.adminUnsubscribe) {
             this.adminUnsubscribe();
@@ -229,9 +208,6 @@ class AuthManager {
             });
     }
 
-    // ============================================
-    // HIỂN THỊ THÔNG TIN USER
-    // ============================================
     async showUserInfo(user, userData) {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
@@ -257,19 +233,6 @@ class AuthManager {
                 const adminLink = document.getElementById('adminLink');
                 if (adminLink) {
                     adminLink.style.display = isAdmin ? 'inline-block' : 'none';
-                    console.log(isAdmin ? '👑 User có quyền admin (từ userData)' : '👤 User không có quyền admin (từ userData)');
-                }
-            } else {
-                const userRef = db.collection('users').doc(user.uid);
-                const doc = await userRef.get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    const isAdmin = data.role === 'admin' || data.isAdmin === true;
-                    const adminLink = document.getElementById('adminLink');
-                    if (adminLink) {
-                        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
-                        console.log(isAdmin ? '👑 User có quyền admin (từ Firestore)' : '👤 User không có quyền admin (từ Firestore)');
-                    }
                 }
             }
         } catch (error) {
@@ -281,9 +244,6 @@ class AuthManager {
         this.enablePrediction(true);
     }
 
-    // ============================================
-    // HIỂN THỊ FORM ĐẶT NICKNAME
-    // ============================================
     showNicknameSetup(user) {
         const modalHtml = `
             <div id="nicknameModal" class="modal" style="display:block;">
@@ -331,9 +291,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // LƯU NICKNAME
-    // ============================================
     async saveNickname() {
         const nicknameInput = document.getElementById('nicknameInput');
         if (!nicknameInput) {
@@ -419,9 +376,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // BỎ QUA ĐẶT NICKNAME
-    // ============================================
     async skipNickname() {
         const user = auth.currentUser;
         if (!user) return;
@@ -460,9 +414,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // CẬP NHẬT NICKNAME
-    // ============================================
     async updateNickname(newNickname) {
         const user = auth.currentUser;
         if (!user) {
@@ -512,9 +463,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // THÊM NÚT ĐỔI TÊN
-    // ============================================
     addChangeNameButton() {
         const userInfo = document.getElementById('userInfo');
         if (!userInfo) return;
@@ -531,9 +479,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // HIỂN THỊ MODAL ĐỔI TÊN
-    // ============================================
     showChangeNameModal() {
         const modalHtml = `
             <div id="changeNameModal" class="modal" style="display:block;">
@@ -579,9 +524,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // XÁC NHẬN ĐỔI TÊN
-    // ============================================
     async confirmChangeName() {
         const input = document.getElementById('newNicknameInput');
         if (!input) return;
@@ -596,9 +538,6 @@ class AuthManager {
         if (modal) modal.remove();
     }
 
-    // ============================================
-    // RESET MẬT KHẨU
-    // ============================================
     async resetPassword() {
         const emailInput = document.getElementById('loginEmail');
         if (!emailInput) {
@@ -633,9 +572,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // HIỂN THỊ LOGIN SECTION
-    // ============================================
     showLoginSection() {
         const userInfo = document.getElementById('userInfo');
         const loginSection = document.getElementById('loginSection');
@@ -655,9 +591,6 @@ class AuthManager {
         this.enablePrediction(false);
     }
 
-    // ============================================
-    // RESET FORMS
-    // ============================================
     resetForms() {
         const emailForm = document.getElementById('emailLoginForm');
         const registerForm = document.getElementById('registerForm');
@@ -691,9 +624,6 @@ class AuthManager {
         });
     }
 
-    // ============================================
-    // ĐĂNG NHẬP GOOGLE
-    // ============================================
     async loginWithGoogle() {
         try {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -709,9 +639,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // ĐĂNG NHẬP EMAIL
-    // ============================================
     async loginWithEmail() {
         const emailInput = document.getElementById('loginEmail');
         const passwordInput = document.getElementById('loginPassword');
@@ -770,9 +697,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // ĐĂNG KÝ
-    // ============================================
     async register() {
         const nameInput = document.getElementById('registerName');
         const emailInput = document.getElementById('registerEmail');
@@ -832,9 +756,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // HIỂN THỊ MODAL ĐĂNG NHẬP
-    // ============================================
     showLoginModal() {
         const modal = document.getElementById('loginModal');
         if (modal) {
@@ -845,9 +766,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // ĐÓNG MODAL
-    // ============================================
     closeModal() {
         const modal = document.getElementById('loginModal');
         if (modal) {
@@ -856,9 +774,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // ENABLE PREDICTION
-    // ============================================
     enablePrediction(enable) {
         const predictButtons = document.querySelectorAll('.predict-btn');
         predictButtons.forEach(btn => {
@@ -872,9 +787,6 @@ class AuthManager {
         });
     }
 
-    // ============================================
-    // LOAD USER DATA
-    // ============================================
     async loadUserData(user) {
         try {
             const doc = await db.collection('users').doc(user.uid).get();
@@ -888,9 +800,6 @@ class AuthManager {
         }
     }
 
-    // ============================================
-    // ĐĂNG XUẤT
-    // ============================================
     async logout() {
         try {
             if (this.adminUnsubscribe) {
@@ -908,9 +817,6 @@ class AuthManager {
     }
 }
 
-// ============================================
-// KHỞI TẠO AUTH MANAGER
-// ============================================
 let authManager;
 
 document.addEventListener('DOMContentLoaded', function() {
