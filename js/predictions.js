@@ -4,6 +4,7 @@ class PredictionManager {
         this.predictions = [];
     }
 
+    // CẬP NHẬT savePrediction
     async savePrediction(matchId, homeScore, awayScore, userHandicap, handicapChoice) {
         if (!window.currentUserId) {
             alert('Vui lòng đăng nhập để dự đoán!');
@@ -11,6 +12,7 @@ class PredictionManager {
         }
 
         try {
+            // Kiểm tra đã dự đoán chưa
             const existing = await db.collection('predictions')
                 .where('matchId', '==', matchId)
                 .where('userId', '==', window.currentUserId)
@@ -25,6 +27,7 @@ class PredictionManager {
                 await batch.commit();
             }
 
+            // Lấy thông tin trận đấu
             const matchDoc = await db.collection('matches').doc(matchId).get();
             const match = matchDoc.data();
             
@@ -38,17 +41,27 @@ class PredictionManager {
                 handicapChoice: handicapChoice || 'draw',
                 points: 0,
                 isCorrect: false,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                isProcessed: false, // Đánh dấu chưa xử lý
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            await db.collection('predictions').add(predictionData);
+            const docRef = await db.collection('predictions').add(predictionData);
+            console.log('✅ Đã lưu dự đoán:', docRef.id);
             
+            // Cập nhật totalPredictions cho user
             const userRef = db.collection('users').doc(window.currentUserId);
             await userRef.update({
                 totalPredictions: firebase.firestore.FieldValue.increment(1)
             });
 
             alert('✅ Dự đoán thành công!');
+            
+            // Reload matches để cập nhật giao diện
+            if (window.matchManager) {
+                window.matchManager.renderMatches();
+            }
+            
             this.loadPredictions();
 
         } catch (error) {

@@ -2,6 +2,8 @@
 window.currentUserId = null;
 window.currentUserName = null;
 
+// THÊM LẮNG NGHE DỰ ĐOÁN
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 World Cup Predictor đã sẵn sàng!');
     
@@ -18,6 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.matchManager = matchManager;
         window.predictionManager = predictionManager;
         window.statisticsManager = statsManager;
+        
+        // Lắng nghe thay đổi auth để refresh matches
+        firebase.auth().onAuthStateChanged(() => {
+            if (window.matchManager) {
+                window.matchManager.renderMatches();
+            }
+        });
         
         console.log('✅ All managers initialized');
     } catch (error) {

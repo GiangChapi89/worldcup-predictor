@@ -33,7 +33,7 @@ class MatchManager {
             });
     }
 
-    // js/matches.js - CẬP NHẬT HÀM renderMatches
+    // SỬA LẠI TOÀN BỘ renderMatches
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -43,29 +43,13 @@ class MatchManager {
             return;
         }
 
-        // Lấy danh sách dự đoán của user hiện tại để đánh dấu
+        // Lấy user hiện tại
         const user = firebase.auth().currentUser;
-        let userPredictions = [];
         
-        // Hàm lấy dự đoán của user (sử dụng biến toàn cục hoặc lấy từ Firestore)
-        async function getUserPredictions() {
-            if (!user) return [];
-            try {
-                const snapshot = await db.collection('predictions')
-                    .where('userId', '==', user.uid)
-                    .get();
-                const preds = [];
-                snapshot.forEach(doc => preds.push(doc.data()));
-                return preds;
-            } catch (e) {
-                console.error('Lỗi lấy dự đoán:', e);
-                return [];
-            }
-        }
-
-        // Lấy dự đoán và render
-        getUserPredictions().then(predictions => {
+        // Hàm render sau khi có dữ liệu dự đoán
+        const renderWithPredictions = (predictions) => {
             const predictedMatchIds = predictions.map(p => p.matchId);
+            console.log('📊 Dự đoán của user:', predictedMatchIds);
             
             const groupedMatches = this.matches.reduce((groups, match) => {
                 const group = match.group || 'Chưa xếp bảng';
@@ -97,28 +81,54 @@ class MatchManager {
                     const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
                     const isPredicted = predictedMatchIds.includes(match.id);
                     
-                    // Màu sắc cho card dựa trên trạng thái
-                    let cardClass = '';
-                    let badgeText = '';
-                    let badgeColor = '';
+                    // Xác định class và style cho card
+                    let cardClass = 'match-card';
+                    let cardStyle = '';
+                    let badgeHtml = '';
+                    let buttonHtml = '';
                     
                     if (isPredicted) {
-                        cardClass = 'match-predicted';
-                        badgeText = '📝 Đã dự đoán';
-                        badgeColor = '#17a2b8';
-                    } else if (isFinished) {
-                        cardClass = 'match-finished';
+                        cardClass += ' predicted';
+                        cardStyle = 'border-left: 4px solid #17a2b8; background: #f0f8ff;';
+                        badgeHtml = `
+                            <div style="position: absolute; top: 10px; right: 10px; background: #17a2b8; color: white; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; z-index: 10;">
+                                📝 Đã dự đoán
+                            </div>
+                        `;
+                    }
+                    
+                    // Nút dự đoán
+                    if (!isFinished) {
+                        if (isPredicted) {
+                            buttonHtml = `
+                                <button class="predict-btn predicted" disabled style="background: #17a2b8; opacity: 0.8; cursor: not-allowed;">
+                                    ✅ Đã dự đoán
+                                </button>
+                            `;
+                        } else if (isLoggedIn) {
+                            buttonHtml = `
+                                <button class="predict-btn" onclick="predictMatch('${match.id}')">
+                                    📝 Dự Đoán
+                                </button>
+                            `;
+                        } else {
+                            buttonHtml = `
+                                <button class="predict-btn" disabled>
+                                    🔒 Đăng nhập để dự đoán
+                                </button>
+                            `;
+                        }
                     } else {
-                        cardClass = 'match-upcoming';
+                        buttonHtml = `
+                            <button class="predict-btn detail-btn" onclick="viewMatchHistory('${match.id}')">
+                                📊 Xem chi tiết
+                            </button>
+                        `;
                     }
                     
                     html += `
-                        <div class="match-card ${cardClass}" style="${isPredicted ? 'border-left: 4px solid #17a2b8; background: #f0f8ff;' : ''}">
-                            ${isPredicted ? `
-                                <div style="position: absolute; top: 10px; right: 10px; background: #17a2b8; color: white; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                                    ${badgeText}
-                                </div>
-                            ` : ''}
+                        <div class="${cardClass}" style="${cardStyle}">
+                            ${badgeHtml}
                             <div class="match-header">
                                 <div class="match-info">
                                     <span class="team">${match.homeTeam || '?'}</span>
@@ -143,18 +153,7 @@ class MatchManager {
                                     `${match.homeScore} - ${match.awayScore} 🏆` : 
                                     '⏳ Chưa diễn ra'}
                             </div>
-                            ${!isFinished ? `
-                                <button class="predict-btn ${isPredicted ? 'predicted' : ''}" 
-                                        onclick="predictMatch('${match.id}')" 
-                                        ${!isLoggedIn || isPredicted ? 'disabled' : ''}
-                                        style="${isPredicted ? 'background: #17a2b8; opacity: 0.7; cursor: not-allowed;' : ''}">
-                                    ${isPredicted ? '✅ Đã dự đoán' : (isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán')}
-                                </button>
-                            ` : `
-                                <button class="predict-btn detail-btn" onclick="viewMatchHistory('${match.id}')">
-                                    📊 Xem chi tiết
-                                </button>
-                            `}
+                            ${buttonHtml}
                         </div>
                     `;
                 });
@@ -166,7 +165,25 @@ class MatchManager {
             }
 
             container.innerHTML = html;
-        });
+        };
+
+        // Nếu có user, lấy dự đoán của họ
+        if (user) {
+            db.collection('predictions')
+                .where('userId', '==', user.uid)
+                .get()
+                .then((snapshot) => {
+                    const predictions = [];
+                    snapshot.forEach(doc => predictions.push(doc.data()));
+                    renderWithPredictions(predictions);
+                })
+                .catch((error) => {
+                    console.error('❌ Lỗi lấy dự đoán:', error);
+                    renderWithPredictions([]);
+                });
+        } else {
+            renderWithPredictions([]);
+        }
     }
 
     // ============================================

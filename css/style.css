@@ -1153,20 +1153,72 @@ section h2 {
 }
 
 /* ============================================
-   PREDICTED MATCHES IN SCHEDULE
+/* style.css - THÊM VÀO CUỐI FILE */
+
+/* ============================================
+   MATCH PREDICTED STATE
    ============================================ */
+
+/* Card đã dự đoán */
 .match-card.predicted {
-    border-left: 4px solid #17a2b8;
-    background: #f0f8ff;
+    border-left: 4px solid #17a2b8 !important;
+    background: #f0f8ff !important;
+    position: relative;
 }
 
-.match-card.predicted .predict-btn:disabled {
+/* Badge đã dự đoán */
+.match-card.predicted .predicted-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
     background: #17a2b8;
+    color: white;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 10;
+}
+
+/* Nút dự đoán đã disabled */
+.match-card.predicted .predict-btn.predicted {
+    background: #17a2b8 !important;
     opacity: 0.8;
     cursor: not-allowed;
 }
 
-.match-card.predicted .predict-btn:disabled:hover {
-    transform: none;
-    box-shadow: none;
+.match-card.predicted .predict-btn.predicted:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Nút dự đoán thông thường */
+.predict-btn:not(.predicted):not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* ============================================
+   MATCH CARD HOVER EFFECTS
+   ============================================ */
+.match-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-hover);
+}
+
+.match-card.predicted:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(23, 162, 184, 0.25);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 480px) {
+    .match-card.predicted .predicted-badge {
+        font-size: 9px;
+        padding: 2px 8px;
+        top: 5px;
+        right: 5px;
+    }
 }
