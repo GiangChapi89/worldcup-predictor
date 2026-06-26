@@ -1,13 +1,28 @@
-// js/app.js
+// js/app.js - SỬA LỖI
+
 window.currentUserId = null;
 window.currentUserName = null;
-
-// THÊM LẮNG NGHE DỰ ĐOÁN
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 World Cup Predictor đã sẵn sàng!');
     
     try {
+        // Kiểm tra các class đã được định nghĩa
+        if (typeof MatchManager === 'undefined') {
+            console.error('❌ MatchManager chưa được định nghĩa!');
+            return;
+        }
+        
+        if (typeof PredictionManager === 'undefined') {
+            console.error('❌ PredictionManager chưa được định nghĩa!');
+            return;
+        }
+        
+        if (typeof StatisticsManager === 'undefined') {
+            console.error('❌ StatisticsManager chưa được định nghĩa!');
+            return;
+        }
+        
         const matchManager = new MatchManager();
         matchManager.listenMatches();
         
@@ -20,13 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.matchManager = matchManager;
         window.predictionManager = predictionManager;
         window.statisticsManager = statsManager;
-        
-        // Lắng nghe thay đổi auth để refresh matches
-        firebase.auth().onAuthStateChanged(() => {
-            if (window.matchManager) {
-                window.matchManager.renderMatches();
-            }
-        });
         
         console.log('✅ All managers initialized');
     } catch (error) {

@@ -1,10 +1,10 @@
-// js/predictions.js
+// js/predictions.js - HOÀN CHỈNH
+
 class PredictionManager {
     constructor() {
         this.predictions = [];
     }
 
-    // CẬP NHẬT savePrediction
     async savePrediction(matchId, homeScore, awayScore, userHandicap, handicapChoice) {
         if (!window.currentUserId) {
             alert('Vui lòng đăng nhập để dự đoán!');
@@ -41,7 +41,7 @@ class PredictionManager {
                 handicapChoice: handicapChoice || 'draw',
                 points: 0,
                 isCorrect: false,
-                isProcessed: false, // Đánh dấu chưa xử lý
+                isProcessed: false,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
@@ -69,43 +69,6 @@ class PredictionManager {
             alert('❌ Lỗi lưu dự đoán: ' + error.message);
         }
     }
-
-    // THÊM HÀM updatePrediction
-
-    async function updatePrediction(matchId) {
-        if (!window.currentUserId) {
-            alert('Vui lòng đăng nhập!');
-            return;
-        }
-
-        try {
-            // Lấy dự đoán hiện tại
-            const snapshot = await db.collection('predictions')
-                .where('matchId', '==', matchId)
-                .where('userId', '==', window.currentUserId)
-                .get();
-            
-            if (snapshot.empty) {
-                alert('❌ Không tìm thấy dự đoán!');
-                return;
-            }
-            
-            // Xóa dự đoán cũ
-            const batch = db.batch();
-            snapshot.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            
-            // Mở form dự đoán mới
-            predictMatch(matchId);
-            
-        } catch (error) {
-            console.error('❌ Lỗi cập nhật dự đoán:', error);
-            alert('❌ Lỗi: ' + error.message);
-        }
-    }
-
-    // Export ra global
-    window.updatePrediction = updatePrediction;
 
     async loadPredictions() {
         try {
@@ -145,6 +108,9 @@ class PredictionManager {
     }
 }
 
+// ============================================
+// HÀM DỰ ĐOÁN - GLOBAL
+// ============================================
 async function predictMatch(matchId) {
     if (!window.currentUserId) {
         document.getElementById('loginModal').style.display = 'block';
@@ -263,6 +229,44 @@ async function predictMatch(matchId) {
     }
 }
 
+// ============================================
+// HÀM CẬP NHẬT DỰ ĐOÁN
+// ============================================
+async function updatePrediction(matchId) {
+    if (!window.currentUserId) {
+        alert('Vui lòng đăng nhập!');
+        return;
+    }
+
+    try {
+        // Lấy dự đoán hiện tại
+        const snapshot = await db.collection('predictions')
+            .where('matchId', '==', matchId)
+            .where('userId', '==', window.currentUserId)
+            .get();
+        
+        if (snapshot.empty) {
+            alert('❌ Không tìm thấy dự đoán!');
+            return;
+        }
+        
+        // Xóa dự đoán cũ
+        const batch = db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        
+        // Mở form dự đoán mới
+        predictMatch(matchId);
+        
+    } catch (error) {
+        console.error('❌ Lỗi cập nhật dự đoán:', error);
+        alert('❌ Lỗi: ' + error.message);
+    }
+}
+
+// ============================================
+// HÀM CẬP NHẬT KÈO CHẤP
+// ============================================
 function updateHandicapOptions(choice, defaultHandicap) {
     const select = document.getElementById('predHandicap');
     const note = document.getElementById('handicapNote');
@@ -383,6 +387,9 @@ function updateLabelStyles(choice) {
     }
 }
 
+// ============================================
+// SUBMIT PREDICTION
+// ============================================
 async function submitPrediction(matchId) {
     const homeScore = document.getElementById('predHomeScore').value;
     const awayScore = document.getElementById('predAwayScore').value;
@@ -410,3 +417,15 @@ async function submitPrediction(matchId) {
     const modal = document.getElementById('predictionModal');
     if (modal) modal.remove();
 }
+
+// ============================================
+// EXPORT GLOBAL FUNCTIONS
+// ============================================
+window.predictMatch = predictMatch;
+window.updatePrediction = updatePrediction;
+window.submitPrediction = submitPrediction;
+window.selectHandicapChoice = selectHandicapChoice;
+window.updateHandicapOptions = updateHandicapOptions;
+window.updateLabelStyles = updateLabelStyles;
+
+console.log('✅ predictions.js loaded successfully');
