@@ -193,7 +193,7 @@ async function loadSchedule() {
     try {
         const db = firebase.firestore();
         const snapshot = await db.collection('matches')
-            .orderBy('date')
+            .orderBy('date', 'desc')  // Sắp xếp từ mới nhất đến cũ nhất
             .get();
         
         if (snapshot.empty) {
@@ -206,6 +206,7 @@ async function loadSchedule() {
             allMatches.push({ id: doc.id, ...doc.data() });
         });
         
+        // Nhóm theo ngày và sắp xếp
         renderSchedule(allMatches);
         
     } catch (error) {
@@ -214,6 +215,8 @@ async function loadSchedule() {
     }
 }
 
+// CẬP NHẬT HÀM renderSchedule - HIỂN THỊ THEO TRẠNG THÁI
+// ============================================
 function renderSchedule(matches) {
     const container = document.getElementById('scheduleList');
     if (!container) return;
@@ -223,7 +226,7 @@ function renderSchedule(matches) {
         return;
     }
     
-    // Nhóm theo ngày
+    // Nhóm theo ngày (giữ nguyên thứ tự đã sắp xếp)
     const grouped = {};
     matches.forEach(match => {
         const date = match.date || 'Chưa có ngày';
@@ -232,21 +235,46 @@ function renderSchedule(matches) {
     });
     
     let html = '';
-    const sortedDates = Object.keys(grouped).sort();
+    // Sắp xếp ngày từ mới nhất đến cũ nhất
+    const sortedDates = Object.keys(grouped).sort((a, b) => {
+        if (a === 'Chưa có ngày') return 1;
+        if (b === 'Chưa có ngày') return -1;
+        return b.localeCompare(a);
+    });
     
     sortedDates.forEach(date => {
+        // Sắp xếp trận trong ngày theo giờ
+        const sortedMatches = grouped[date].sort((a, b) => {
+            if (!a.time) return 1;
+            if (!b.time) return -1;
+            return b.time.localeCompare(a.time);
+        });
+        
+        // Đếm số trận đã kết thúc và sắp diễn ra
+        const finished = sortedMatches.filter(m => m.status === 'finished').length;
+        const upcoming = sortedMatches.filter(m => m.status === 'upcoming' || !m.status).length;
+        
         html += `<div class="group-section">`;
-        html += `<div class="group-header"><span class="group-title">📅 ${date}</span><span class="group-count">${grouped[date].length} trận</span></div>`;
+        html += `
+            <div class="group-header">
+                <span class="group-title">📅 ${date}</span>
+                <span class="group-count">
+                    ${sortedMatches.length} trận 
+                    ${finished > 0 ? `| ✅ ${finished} đã kết thúc` : ''}
+                    ${upcoming > 0 ? `| ⏳ ${upcoming} sắp diễn ra` : ''}
+                </span>
+            </div>
+        `;
         html += `<div class="match-grid">`;
         
-        grouped[date].forEach(match => {
+        sortedMatches.forEach(match => {
             const isFinished = match.status === 'finished';
+            const isLoggedIn = !!window.currentUserId;
             const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
             
             // Tìm bảng của đội
             let groupDisplay = match.group || '';
             if (!groupDisplay && typeof TEAM_TO_GROUP !== 'undefined') {
-                // Nếu trận đấu chưa có group, lấy từ mapping
                 const homeGroup = TEAM_TO_GROUP[match.homeTeam];
                 const awayGroup = TEAM_TO_GROUP[match.awayTeam];
                 if (homeGroup && homeGroup === awayGroup) {
@@ -259,26 +287,38 @@ function renderSchedule(matches) {
             }
             
             html += `
-                <div class="match-card">
-                    <div class="match-info">
-                        <span class="team">${match.homeTeam || '?'}</span>
-                        <span class="vs">vs</span>
-                        <span class="team">${match.awayTeam || '?'}</span>
+                <div class="match-card ${isFinished ? 'finished' : 'upcoming'}">
+                    <div class="match-header">
+                        <div class="match-info">
+                            <span class="team">${match.homeTeam || '?'}</span>
+                            <span class="vs">vs</span>
+                            <span class="team">${match.awayTeam || '?'}</span>
+                        </div>
+                        <div class="match-badge">
+                            <span class="match-status-badge ${isFinished ? 'finished' : 'upcoming'}">
+                                ${isFinished ? '✅ Đã kết thúc' : '⏳ Sắp diễn ra'}
+                            </span>
+                            ${groupDisplay ? `<span class="group-badge">${groupDisplay}</span>` : ''}
+                        </div>
                     </div>
                     <div class="match-details">
                         <span>⏰ ${match.time || 'N/A'}</span>
                         <span>${handicapDisplay}</span>
-                        ${groupDisplay ? `<span>🏆 ${groupDisplay}</span>` : ''}
+                        ${match.stage ? `<span>🏷️ ${match.stage}</span>` : ''}
                     </div>
                     <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
-                        ${isFinished ? `${match.homeScore} - ${match.awayScore} 🏆` : '⏳ Chưa diễn ra'}
+                        ${isFinished ? 
+                            `${match.homeScore} - ${match.awayScore} 🏆` : 
+                            '⏳ Chưa diễn ra'}
                     </div>
                     ${!isFinished ? `
-                        <button class="predict-btn" onclick="predictMatch('${match.id}')" ${!window.currentUserId ? 'disabled' : ''}>
-                            ${window.currentUserId ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán'}
+                        <button class="predict-btn" onclick="predictMatch('${match.id}')" 
+                                ${!isLoggedIn ? 'disabled' : ''}>
+                            ${isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán'}
                         </button>
                     ` : `
-                        <button class="predict-btn" onclick="viewMatchHistory('${match.id}')" style="background: linear-gradient(135deg, #00b894, #00a86b);">
+                        <button class="predict-btn" onclick="viewMatchHistory('${match.id}')" 
+                                style="background: linear-gradient(135deg, #00b894, #00a86b);">
                             📊 Xem chi tiết
                         </button>
                     `}
@@ -586,14 +626,15 @@ async function loadMyPredictions() {
 }
 
 // ============================================
-// BỘ LỌC
+// CẬP NHẬT HÀM applyScheduleFilters - THÊM LỌC TRẠNG THÁI
 // ============================================
 function applyScheduleFilters() {
     const dateFilter = document.getElementById('scheduleDateFilter').value;
     const groupFilter = document.getElementById('scheduleGroupFilter').value;
     const teamFilter = document.getElementById('scheduleTeamFilter').value;
+    const statusFilter = document.getElementById('scheduleStatusFilter').value;
     
-    console.log('🔍 Áp dụng lọc:', { dateFilter, groupFilter, teamFilter });
+    console.log('🔍 Áp dụng lọc:', { dateFilter, groupFilter, teamFilter, statusFilter });
     
     let filtered = [...allMatches];
     
@@ -609,13 +650,20 @@ function applyScheduleFilters() {
         filtered = filtered.filter(m => m.homeTeam === teamFilter || m.awayTeam === teamFilter);
     }
     
+    if (statusFilter !== 'all') {
+        filtered = filtered.filter(m => m.status === statusFilter);
+    }
+    
     renderSchedule(filtered);
 }
 
+// HÀM RESET LỌC
+// ============================================
 function resetScheduleFilters() {
     document.getElementById('scheduleDateFilter').value = '';
     document.getElementById('scheduleGroupFilter').value = 'all';
     document.getElementById('scheduleTeamFilter').value = 'all';
+    document.getElementById('scheduleStatusFilter').value = 'all';
     renderSchedule(allMatches);
 }
 

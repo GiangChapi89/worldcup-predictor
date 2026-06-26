@@ -459,6 +459,7 @@
                 <div class="filter-section" id="scheduleFilterSection">
                     <label>📅 Theo ngày:</label>
                     <input type="date" id="scheduleDateFilter">
+                    
                     <label>🏆 Theo bảng:</label>
                     <select id="scheduleGroupFilter">
                         <option value="all">Tất cả bảng</option>
@@ -475,10 +476,20 @@
                         <option value="Group K">Group K</option>
                         <option value="Group L">Group L</option>
                     </select>
+                    
                     <label>🏷️ Theo đội:</label>
                     <select id="scheduleTeamFilter">
                         <option value="all">Tất cả đội</option>
                     </select>
+                    
+                    <!-- 👇 THÊM BỘ LỌC TRẠNG THÁI -->
+                    <label>📊 Trạng thái:</label>
+                    <select id="scheduleStatusFilter">
+                        <option value="all">Tất cả</option>
+                        <option value="upcoming">⏳ Sắp diễn ra</option>
+                        <option value="finished">✅ Đã kết thúc</option>
+                    </select>
+                    
                     <button class="filter-btn" onclick="applyScheduleFilters()">🔍 Lọc</button>
                     <button class="filter-btn reset" onclick="resetScheduleFilters()">🔄 Reset</button>
                 </div>

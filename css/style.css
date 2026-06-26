@@ -245,6 +245,87 @@ section h2 {
 }
 
 /* ============================================
+   FILTER SECTION
+   ============================================ */
+.filter-section {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0 20px 0;
+    flex-wrap: wrap;
+    align-items: center;
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.filter-section label {
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.filter-section select,
+.filter-section input {
+    padding: 8px 14px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    min-width: 120px;
+}
+
+.filter-section select:focus,
+.filter-section input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.filter-section .filter-btn {
+    padding: 8px 20px;
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.filter-section .filter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.filter-section .filter-btn.reset {
+    background: #6c757d;
+}
+
+.filter-section .filter-btn.reset:hover {
+    background: #5a6268;
+}
+
+/* Responsive filter */
+@media (max-width: 768px) {
+    .filter-section {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-section select,
+    .filter-section input {
+        width: 100%;
+        min-width: unset;
+    }
+    
+    .filter-section label {
+        margin-top: 5px;
+    }
+}
+
+/* ============================================
    GROUP SECTION
    ============================================ */
 .group-section {
@@ -271,8 +352,8 @@ section h2 {
 }
 
 .group-count {
-    font-size: 0.9rem;
-    opacity: 0.8;
+    font-size: 0.85rem;
+    opacity: 0.9;
     background: rgba(255, 255, 255, 0.2);
     padding: 4px 12px;
     border-radius: 20px;
@@ -304,6 +385,15 @@ section h2 {
     border: 1px solid rgba(0, 0, 0, 0.04);
     position: relative;
     overflow: hidden;
+}
+
+/* Thêm viền trái theo trạng thái */
+.match-card.upcoming {
+    border-left: 4px solid var(--warning-color);
+}
+
+.match-card.finished {
+    border-left: 4px solid var(--success-color);
 }
 
 .match-card:hover {
@@ -385,12 +475,12 @@ section h2 {
 }
 
 .match-status-badge.upcoming {
-    background: #ffc107;
+    background: var(--warning-color);
     color: #333;
 }
 
 .match-status-badge.finished {
-    background: #28a745;
+    background: var(--success-color);
     color: white;
 }
 
@@ -400,7 +490,7 @@ section h2 {
     border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
-    background: #667eea;
+    background: var(--primary-color);
     color: white;
 }
 
@@ -459,6 +549,15 @@ section h2 {
     opacity: 0.5;
     cursor: not-allowed;
     background: #b2bec3;
+}
+
+/* Nút Xem chi tiết màu xanh */
+.predict-btn.detail-btn {
+    background: linear-gradient(135deg, #00b894, #00a86b);
+}
+
+.predict-btn.detail-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 25px rgba(0, 184, 148, 0.4);
 }
 
 /* ============================================
@@ -627,7 +726,7 @@ section h2 {
 }
 
 .password-wrapper .toggle-password:hover {
-    color: #667eea;
+    color: var(--primary-color);
     transform: scale(1.1);
 }
 
@@ -759,6 +858,18 @@ section h2 {
     background: var(--primary-gradient);
     border-radius: 10px;
     transition: width 1s ease;
+}
+
+/* ============================================
+   SUBTAB CONTENT
+   ============================================ */
+.subtab-content {
+    display: none;
+}
+
+.subtab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
 }
 
 /* ============================================
@@ -905,6 +1016,10 @@ section h2 {
     #rankingTable td {
         padding: 6px 8px;
     }
+
+    .filter-section {
+        padding: 10px;
+    }
 }
 
 /* ============================================
@@ -922,7 +1037,7 @@ section h2 {
     width: 20px;
     height: 20px;
     border: 3px solid #f0f0f0;
-    border-top-color: #667eea;
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     margin-left: 10px;
@@ -942,11 +1057,33 @@ section h2 {
 }
 
 .badge-active {
-    background: #28a745;
+    background: var(--success-color);
     color: white;
 }
 
 .badge-locked {
-    background: #dc3545;
+    background: var(--danger-color);
     color: white;
+}
+
+.badge-admin {
+    background: #ffd700;
+    color: #333;
+}
+
+.badge-user {
+    background: #e0e0e0;
+    color: #666;
+}
+
+/* No results */
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: #888;
+}
+
+.no-results .icon {
+    font-size: 48px;
+    margin-bottom: 15px;
 }
