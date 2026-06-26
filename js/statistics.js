@@ -1,4 +1,5 @@
-// js/statistics.js
+// js/statistics.js - CẬP NHẬT HÀM renderDailyStats
+
 class StatisticsManager {
     async loadRanking() {
         console.log('📊 Đang tải bảng xếp hạng...');
@@ -90,8 +91,12 @@ class StatisticsManager {
         if (!container) return;
 
         try {
+            const db = firebase.firestore();
+            
+            // Lấy tất cả trận đã kết thúc, sắp xếp theo ngày giảm dần (mới nhất trước)
             const matchesSnapshot = await db.collection('matches')
                 .where('status', '==', 'finished')
+                .orderBy('date', 'desc')
                 .get();
 
             if (matchesSnapshot.empty) {
@@ -106,6 +111,7 @@ class StatisticsManager {
             const dailyData = {};
             const predictionsSnap = await db.collection('predictions').get();
 
+            // Thu thập dữ liệu theo ngày
             for (const matchDoc of matchesSnapshot.docs) {
                 const match = matchDoc.data();
                 const date = match.date || 'Chưa có ngày';
@@ -114,10 +120,15 @@ class StatisticsManager {
                     dailyData[date] = {
                         totalPredictions: 0,
                         correctPredictions: 0,
-                        totalPoints: 0
+                        totalPoints: 0,
+                        matchCount: 0
                     };
                 }
+                
+                // Đếm số trận trong ngày
+                dailyData[date].matchCount++;
 
+                // Lấy dự đoán cho trận này
                 const matchPredictions = predictionsSnap.docs.filter(doc => {
                     return doc.data().matchId === matchDoc.id;
                 });
@@ -132,9 +143,14 @@ class StatisticsManager {
                 });
             }
 
+            // Lấy danh sách các ngày và sắp xếp từ mới nhất đến cũ nhất
+            const sortedDates = Object.keys(dailyData).sort((a, b) => {
+                if (a === 'Chưa có ngày') return 1;
+                if (b === 'Chưa có ngày') return -1;
+                return b.localeCompare(a);
+            });
+
             let html = '<h3>📊 Thống Kê Theo Ngày</h3><div class="daily-stats">';
-            
-            const sortedDates = Object.keys(dailyData).sort();
             
             for (const date of sortedDates) {
                 const data = dailyData[date];
@@ -144,10 +160,11 @@ class StatisticsManager {
                 html += `
                     <div class="day-stat">
                         <h4>📅 ${date}</h4>
+                        <p>⚽ Số trận: ${data.matchCount}</p>
                         <p>📝 Tổng dự đoán: ${data.totalPredictions}</p>
                         <p>✅ Dự đoán đúng: ${data.correctPredictions}</p>
                         <p>💰 Tổng điểm: ${data.totalPoints}</p>
-                        <p>🎯 Tỷ lệ: ${accuracy}%</p>
+                        <p>🎯 Tỷ lệ đúng: ${accuracy}%</p>
                         <div class="progress-bar">
                             <div class="progress" style="width: ${accuracy}%"></div>
                         </div>

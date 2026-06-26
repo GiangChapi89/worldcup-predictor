@@ -192,8 +192,9 @@ async function loadSchedule() {
     
     try {
         const db = firebase.firestore();
+        // Sắp xếp từ mới nhất đến cũ nhất
         const snapshot = await db.collection('matches')
-            .orderBy('date', 'desc')  // Sắp xếp từ mới nhất đến cũ nhất
+            .orderBy('date', 'desc')
             .get();
         
         if (snapshot.empty) {
@@ -206,7 +207,6 @@ async function loadSchedule() {
             allMatches.push({ id: doc.id, ...doc.data() });
         });
         
-        // Nhóm theo ngày và sắp xếp
         renderSchedule(allMatches);
         
     } catch (error) {

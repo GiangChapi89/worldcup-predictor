@@ -221,21 +221,19 @@ async function loadMatches() {
     try {
         const db = firebase.firestore();
         console.log('📡 Fetching matches from Firestore...');
+        // Sắp xếp từ mới nhất đến cũ nhất
         const snapshot = await db.collection('matches')
-            .orderBy('date')
+            .orderBy('date', 'desc')
             .get();
         
         console.log('📦 Matches found:', snapshot.size);
         
-        // Lưu tất cả dữ liệu
         adminAllMatches = [];
         snapshot.forEach(doc => {
             adminAllMatches.push({ id: doc.id, ...doc.data() });
         });
         
-        // Load teams cho dropdown
         await loadAdminTeams();
-        
         renderAdminMatches(adminAllMatches);
         
     } catch (error) {
