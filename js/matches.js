@@ -89,7 +89,6 @@ class MatchManager {
         const user = firebase.auth().currentUser;
         
         const renderWithPredictions = (predictions) => {
-            // Tạo map dự đoán theo matchId
             const predictionMap = {};
             predictions.forEach(p => {
                 predictionMap[p.matchId] = p;
@@ -97,7 +96,6 @@ class MatchManager {
             
             console.log('📊 Số dự đoán của user:', Object.keys(predictionMap).length);
             
-            // Nhóm trận đấu theo bảng
             const groupedMatches = this.matches.reduce((groups, match) => {
                 const group = match.group || 'Chưa xếp bảng';
                 if (!groups[group]) {
@@ -212,7 +210,6 @@ class MatchManager {
             container.innerHTML = html;
         };
 
-        // Lấy dự đoán của user
         if (user) {
             db.collection('predictions')
                 .where('userId', '==', user.uid)

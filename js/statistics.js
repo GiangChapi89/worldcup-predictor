@@ -6,51 +6,48 @@ class StatisticsManager {
         try {
             const db = firebase.firestore();
             
-            // 1. Lấy tất cả users
+            // Lấy tất cả users
             const usersSnapshot = await db.collection('users')
                 .orderBy('totalPoints', 'desc')
                 .get();
 
-            // 2. Lấy tất cả dự đoán đã xử lý (isProcessed = true)
+            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
             const predictionsSnapshot = await db.collection('predictions')
                 .where('isProcessed', '==', true)
                 .get();
 
-            // 3. Tạo map thống kê từ dự đoán
-            const statsMap = {};
+            // Tạo map để tính toán
+            const userStats = {};
             
             // Khởi tạo stats cho từng user
             usersSnapshot.forEach(doc => {
                 const data = doc.data();
-                statsMap[doc.id] = {
+                userStats[doc.id] = {
                     id: doc.id,
                     name: data.nickname || data.name || data.email || 'Anonymous',
-                    totalPoints: data.totalPoints || 0,
-                    correctPredictions: data.correctPredictions || 0,
-                    totalPredictions: data.totalPredictions || 0,
+                    totalPoints: 0,
+                    correctPredictions: 0,
+                    totalPredictions: 0,
                     balance: data.balance || 0
                 };
             });
 
-            // Cập nhật thống kê từ dự đoán đã xử lý
+            // Tính toán từ dự đoán đã xử lý
             predictionsSnapshot.forEach(doc => {
                 const pred = doc.data();
                 const userId = pred.userId;
                 
-                if (statsMap[userId]) {
-                    // Đếm tổng dự đoán đã xử lý
-                    statsMap[userId].totalPredictions = (statsMap[userId].totalPredictions || 0) + 1;
-                    
-                    // Đếm dự đoán đúng
+                if (userStats[userId]) {
+                    userStats[userId].totalPredictions = (userStats[userId].totalPredictions || 0) + 1;
                     if (pred.isCorrect) {
-                        statsMap[userId].correctPredictions = (statsMap[userId].correctPredictions || 0) + 1;
-                        statsMap[userId].totalPoints = (statsMap[userId].totalPoints || 0) + (pred.points || 1);
+                        userStats[userId].correctPredictions = (userStats[userId].correctPredictions || 0) + 1;
+                        userStats[userId].totalPoints = (userStats[userId].totalPoints || 0) + (pred.points || 0);
                     }
                 }
             });
 
             // Chuyển thành array và sắp xếp
-            const ranking = Object.values(statsMap);
+            const ranking = Object.values(userStats);
             ranking.sort((a, b) => b.totalPoints - a.totalPoints);
 
             this.renderRanking(ranking);
