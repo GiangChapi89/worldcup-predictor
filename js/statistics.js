@@ -4,22 +4,51 @@ class StatisticsManager {
     async loadRanking() {
         console.log('📊 Đang tải bảng xếp hạng...');
         try {
+            const db = firebase.firestore();
+            
+            // Lấy tất cả users
             const usersSnapshot = await db.collection('users')
                 .orderBy('totalPoints', 'desc')
                 .get();
 
-            const ranking = [];
+            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
+            const predictionsSnapshot = await db.collection('predictions')
+                .where('isProcessed', '==', true)
+                .get();
+            
+            // Tạo map để đếm dự đoán đúng và tổng điểm
+            const userStats = {};
+            
+            // Khởi tạo stats cho từng user
             usersSnapshot.forEach(doc => {
                 const data = doc.data();
-                ranking.push({
+                userStats[doc.id] = {
                     id: doc.id,
                     name: data.nickname || data.name || data.email || 'Anonymous',
                     totalPoints: data.totalPoints || 0,
                     correctPredictions: data.correctPredictions || 0,
                     totalPredictions: data.totalPredictions || 0,
                     balance: data.balance || 0
-                });
+                };
             });
+            
+            // Đếm dự đoán đúng và tổng điểm từ predictions
+            predictionsSnapshot.forEach(doc => {
+                const pred = doc.data();
+                const userId = pred.userId;
+                
+                if (userStats[userId]) {
+                    // Chỉ đếm nếu dự đoán đúng
+                    if (pred.isCorrect) {
+                        // Không cần tăng vì đã có trong user data
+                    }
+                    // totalPredictions đã có trong user data
+                }
+            });
+            
+            // Chuyển thành array và sắp xếp
+            const ranking = Object.values(userStats);
+            ranking.sort((a, b) => b.totalPoints - a.totalPoints);
 
             this.renderRanking(ranking);
             await this.renderDailyStats();
@@ -93,7 +122,7 @@ class StatisticsManager {
         try {
             const db = firebase.firestore();
             
-            // Lấy tất cả trận đã kết thúc, sắp xếp theo ngày giảm dần (mới nhất trước)
+            // Lấy tất cả trận đã kết thúc
             const matchesSnapshot = await db.collection('matches')
                 .where('status', '==', 'finished')
                 .orderBy('date', 'desc')
@@ -108,12 +137,28 @@ class StatisticsManager {
                 return;
             }
 
-            const dailyData = {};
-            const predictionsSnap = await db.collection('predictions').get();
+            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
+            const predictionsSnap = await db.collection('predictions')
+                .where('isProcessed', '==', true)
+                .get();
 
-            // Thu thập dữ liệu theo ngày
+            // Tạo map dự đoán theo matchId
+            const predictionsByMatch = {};
+            predictionsSnap.forEach(doc => {
+                const pred = doc.data();
+                const matchId = pred.matchId;
+                if (!predictionsByMatch[matchId]) {
+                    predictionsByMatch[matchId] = [];
+                }
+                predictionsByMatch[matchId].push(pred);
+            });
+
+            const dailyData = {};
+
+            // Xử lý từng trận
             for (const matchDoc of matchesSnapshot.docs) {
                 const match = matchDoc.data();
+                const matchId = matchDoc.id;
                 const date = match.date || 'Chưa có ngày';
                 
                 if (!dailyData[date]) {
@@ -125,16 +170,12 @@ class StatisticsManager {
                     };
                 }
                 
-                // Đếm số trận trong ngày
                 dailyData[date].matchCount++;
 
                 // Lấy dự đoán cho trận này
-                const matchPredictions = predictionsSnap.docs.filter(doc => {
-                    return doc.data().matchId === matchDoc.id;
-                });
-
-                matchPredictions.forEach(doc => {
-                    const pred = doc.data();
+                const matchPredictions = predictionsByMatch[matchId] || [];
+                
+                matchPredictions.forEach(pred => {
                     dailyData[date].totalPredictions++;
                     if (pred.isCorrect) {
                         dailyData[date].correctPredictions++;
@@ -143,7 +184,7 @@ class StatisticsManager {
                 });
             }
 
-            // Lấy danh sách các ngày và sắp xếp từ mới nhất đến cũ nhất
+            // Sắp xếp ngày từ mới nhất đến cũ nhất
             const sortedDates = Object.keys(dailyData).sort((a, b) => {
                 if (a === 'Chưa có ngày') return 1;
                 if (b === 'Chưa có ngày') return -1;

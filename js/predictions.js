@@ -70,6 +70,43 @@ class PredictionManager {
         }
     }
 
+    // THÊM HÀM updatePrediction
+
+    async function updatePrediction(matchId) {
+        if (!window.currentUserId) {
+            alert('Vui lòng đăng nhập!');
+            return;
+        }
+
+        try {
+            // Lấy dự đoán hiện tại
+            const snapshot = await db.collection('predictions')
+                .where('matchId', '==', matchId)
+                .where('userId', '==', window.currentUserId)
+                .get();
+            
+            if (snapshot.empty) {
+                alert('❌ Không tìm thấy dự đoán!');
+                return;
+            }
+            
+            // Xóa dự đoán cũ
+            const batch = db.batch();
+            snapshot.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            
+            // Mở form dự đoán mới
+            predictMatch(matchId);
+            
+        } catch (error) {
+            console.error('❌ Lỗi cập nhật dự đoán:', error);
+            alert('❌ Lỗi: ' + error.message);
+        }
+    }
+
+    // Export ra global
+    window.updatePrediction = updatePrediction;
+
     async loadPredictions() {
         try {
             const snapshot = await db.collection('predictions')

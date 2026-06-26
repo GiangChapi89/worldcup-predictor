@@ -1,8 +1,10 @@
-// js/matches.js
+// js/matches.js - HOÀN CHỈNH
+
 class MatchManager {
     constructor() {
         this.matches = [];
         this.unsubscribe = null;
+        this.predictionsListener = null;
     }
 
     listenMatches() {
@@ -13,9 +15,9 @@ class MatchManager {
         }
         
         this.unsubscribe = db.collection('matches')
-            .orderBy('date')
+            .orderBy('date', 'desc')
             .onSnapshot((snapshot) => {
-                console.log('📦 Nhận snapshot, số lượng:', snapshot.size);
+                console.log('📦 Nhận snapshot matches, số lượng:', snapshot.size);
                 if (snapshot.empty) {
                     document.getElementById('matchList').innerHTML = 
                         '<p>⚠️ Chưa có trận đấu nào. Hãy thêm dữ liệu mẫu!</p>';
@@ -31,9 +33,41 @@ class MatchManager {
                 document.getElementById('matchList').innerHTML = 
                     `<p style="color:red;">❌ Lỗi tải dữ liệu: ${error.message}</p>`;
             });
+
+        // Lắng nghe thay đổi dự đoán để cập nhật UI
+        const user = firebase.auth().currentUser;
+        if (user) {
+            this.listenPredictions(user.uid);
+        }
+
+        // Lắng nghe thay đổi auth state
+        firebase.auth().onAuthStateChanged((user) => {
+            if (this.predictionsListener) {
+                this.predictionsListener();
+                this.predictionsListener = null;
+            }
+            if (user) {
+                this.listenPredictions(user.uid);
+            }
+            this.renderMatches();
+        });
     }
 
-    // SỬA LẠI TOÀN BỘ renderMatches
+    listenPredictions(userId) {
+        if (!userId) return;
+        
+        console.log('📡 Lắng nghe dự đoán của user:', userId);
+        
+        this.predictionsListener = db.collection('predictions')
+            .where('userId', '==', userId)
+            .onSnapshot(() => {
+                console.log('📦 Có thay đổi dự đoán, cập nhật UI...');
+                this.renderMatches();
+            }, (error) => {
+                console.error('❌ Lỗi lắng nghe dự đoán:', error);
+            });
+    }
+
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -43,13 +77,16 @@ class MatchManager {
             return;
         }
 
-        // Lấy user hiện tại
         const user = firebase.auth().currentUser;
         
-        // Hàm render sau khi có dữ liệu dự đoán
         const renderWithPredictions = (predictions) => {
-            const predictedMatchIds = predictions.map(p => p.matchId);
-            console.log('📊 Dự đoán của user:', predictedMatchIds);
+            // Tạo map dự đoán theo matchId để kiểm tra nhanh
+            const predictionMap = {};
+            predictions.forEach(p => {
+                predictionMap[p.matchId] = p;
+            });
+            
+            console.log('📊 Số dự đoán của user:', Object.keys(predictionMap).length);
             
             const groupedMatches = this.matches.reduce((groups, match) => {
                 const group = match.group || 'Chưa xếp bảng';
@@ -79,9 +116,8 @@ class MatchManager {
                     const isFinished = match.status === 'finished';
                     const isLoggedIn = !!window.currentUserId;
                     const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
-                    const isPredicted = predictedMatchIds.includes(match.id);
+                    const isPredicted = !!predictionMap[match.id];
                     
-                    // Xác định class và style cho card
                     let cardClass = 'match-card';
                     let cardStyle = '';
                     let badgeHtml = '';
@@ -97,12 +133,12 @@ class MatchManager {
                         `;
                     }
                     
-                    // Nút dự đoán
                     if (!isFinished) {
                         if (isPredicted) {
+                            // Cho phép cập nhật dự đoán
                             buttonHtml = `
-                                <button class="predict-btn predicted" disabled style="background: #17a2b8; opacity: 0.8; cursor: not-allowed;">
-                                    ✅ Đã dự đoán
+                                <button class="predict-btn predicted" onclick="updatePrediction('${match.id}')" style="background: #17a2b8;">
+                                    🔄 Cập nhật
                                 </button>
                             `;
                         } else if (isLoggedIn) {
@@ -167,7 +203,6 @@ class MatchManager {
             container.innerHTML = html;
         };
 
-        // Nếu có user, lấy dự đoán của họ
         if (user) {
             db.collection('predictions')
                 .where('userId', '==', user.uid)
@@ -611,6 +646,10 @@ class MatchManager {
     stopListening() {
         if (this.unsubscribe) {
             this.unsubscribe();
+        }
+        if (this.predictionsListener) {
+            this.predictionsListener();
+            this.predictionsListener = null;
         }
     }
 }
