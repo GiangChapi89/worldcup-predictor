@@ -6,50 +6,60 @@ class StatisticsManager {
         try {
             const db = firebase.firestore();
             
-            // Lấy tất cả users
-            const usersSnapshot = await db.collection('users')
-                .orderBy('totalPoints', 'desc')
-                .get();
-
-            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
-            const predictionsSnapshot = await db.collection('predictions')
+            // 1. Lấy tất cả dự đoán đã xử lý từ collection predictions
+            const predictionsSnap = await db.collection('predictions')
                 .where('isProcessed', '==', true)
                 .get();
-
-            // Tạo map để tính toán
-            const userStats = {};
             
-            // Khởi tạo stats cho từng user
-            usersSnapshot.forEach(doc => {
-                const data = doc.data();
-                userStats[doc.id] = {
-                    id: doc.id,
-                    name: data.nickname || data.name || data.email || 'Anonymous',
-                    totalPoints: 0,
-                    correctPredictions: 0,
-                    totalPredictions: 0,
-                    balance: data.balance || 0
-                };
-            });
-
-            // Tính toán từ dự đoán đã xử lý
-            predictionsSnapshot.forEach(doc => {
+            // 2. Tính toán thống kê từ dự đoán
+            const statsMap = {};
+            
+            predictionsSnap.forEach(doc => {
                 const pred = doc.data();
                 const userId = pred.userId;
                 
-                if (userStats[userId]) {
-                    userStats[userId].totalPredictions = (userStats[userId].totalPredictions || 0) + 1;
-                    if (pred.isCorrect) {
-                        userStats[userId].correctPredictions = (userStats[userId].correctPredictions || 0) + 1;
-                        userStats[userId].totalPoints = (userStats[userId].totalPoints || 0) + (pred.points || 0);
-                    }
+                if (!statsMap[userId]) {
+                    statsMap[userId] = {
+                        id: userId,
+                        name: pred.userName || 'Anonymous',
+                        totalPredictions: 0,
+                        correctPredictions: 0,
+                        totalPoints: 0,
+                        balance: 0
+                    };
+                }
+                
+                statsMap[userId].totalPredictions++;
+                if (pred.isCorrect) {
+                    statsMap[userId].correctPredictions++;
+                    statsMap[userId].totalPoints += (pred.points || 0);
                 }
             });
-
-            // Chuyển thành array và sắp xếp
-            const ranking = Object.values(userStats);
+            
+            // 3. Lấy thông tin user để có balance và nickname
+            const usersSnap = await db.collection('users').get();
+            usersSnap.forEach(doc => {
+                const data = doc.data();
+                if (statsMap[doc.id]) {
+                    statsMap[doc.id].name = data.nickname || data.name || data.email || 'Anonymous';
+                    statsMap[doc.id].balance = data.balance || 0;
+                } else {
+                    // User chưa có dự đoán nào
+                    statsMap[doc.id] = {
+                        id: doc.id,
+                        name: data.nickname || data.name || data.email || 'Anonymous',
+                        totalPredictions: 0,
+                        correctPredictions: 0,
+                        totalPoints: 0,
+                        balance: data.balance || 0
+                    };
+                }
+            });
+            
+            // 4. Chuyển thành array và sắp xếp
+            const ranking = Object.values(statsMap);
             ranking.sort((a, b) => b.totalPoints - a.totalPoints);
-
+            
             this.renderRanking(ranking);
             await this.renderDailyStats();
             
@@ -123,7 +133,7 @@ class StatisticsManager {
         try {
             const db = firebase.firestore();
             
-            // Lấy tất cả trận đã kết thúc
+            // 1. Lấy tất cả trận đã kết thúc
             const matchesSnapshot = await db.collection('matches')
                 .where('status', '==', 'finished')
                 .orderBy('date', 'desc')
@@ -138,12 +148,12 @@ class StatisticsManager {
                 return;
             }
 
-            // Lấy tất cả dự đoán đã xử lý
+            // 2. Lấy tất cả dự đoán đã xử lý
             const predictionsSnap = await db.collection('predictions')
                 .where('isProcessed', '==', true)
                 .get();
 
-            // Tạo map dự đoán theo matchId
+            // 3. Tạo map dự đoán theo matchId
             const predictionsByMatch = {};
             predictionsSnap.forEach(doc => {
                 const pred = doc.data();
@@ -156,7 +166,7 @@ class StatisticsManager {
 
             const dailyData = {};
 
-            // Xử lý từng trận
+            // 4. Xử lý từng trận
             for (const matchDoc of matchesSnapshot.docs) {
                 const match = matchDoc.data();
                 const matchId = matchDoc.id;
@@ -185,7 +195,7 @@ class StatisticsManager {
                 });
             }
 
-            // Sắp xếp ngày từ mới nhất đến cũ nhất
+            // 5. Sắp xếp ngày từ mới nhất đến cũ nhất
             const sortedDates = Object.keys(dailyData).sort((a, b) => {
                 if (a === 'Chưa có ngày') return 1;
                 if (b === 'Chưa có ngày') return -1;
