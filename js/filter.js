@@ -458,9 +458,10 @@ async function loadMyPredictions() {
     try {
         const db = firebase.firestore();
         
-        // Lấy dữ liệu KHÔNG orderBy để tránh lỗi index
-        const snapshot = await db.collection('user_predictions_history')
+        // Lấy dự đoán từ collection predictions (nơi lưu dự đoán thực tế)
+        const snapshot = await db.collection('predictions')
             .where('userId', '==', user.uid)
+            .orderBy('timestamp', 'desc')
             .get();
         
         if (snapshot.empty) {
@@ -474,31 +475,40 @@ async function loadMyPredictions() {
             return;
         }
         
-        // Sắp xếp trong JavaScript
-        const docs = [];
-        snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-        docs.sort((a, b) => {
-            const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-            const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
-            return timeB - timeA;
+        // Lấy thông tin trận đấu để hiển thị
+        const matchesSnapshot = await db.collection('matches').get();
+        const matchesMap = {};
+        matchesSnapshot.forEach(doc => {
+            matchesMap[doc.id] = doc.data();
         });
         
         let html = '';
         let totalPoints = 0;
         let correctCount = 0;
-        let totalPredictions = docs.length;
-        let hasHistory = false;
+        let totalPredictions = 0;
         
-        docs.forEach(pred => {
+        const predictions = [];
+        snapshot.forEach(doc => {
+            predictions.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sắp xếp theo thời gian giảm dần
+        predictions.sort((a, b) => {
+            const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+            const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
+            return timeB - timeA;
+        });
+        
+        predictions.forEach(pred => {
+            const matchId = pred.matchId;
+            const match = matchesMap[matchId] || {};
+            
+            totalPredictions++;
             totalPoints += pred.points || 0;
             if (pred.isCorrect) correctCount++;
-            if (pred.isProcessed) hasHistory = true;
             
-            const isCorrect = pred.isCorrect || false;
             const isProcessed = pred.isProcessed || false;
-            const matchDate = pred.matchDate || 'N/A';
-            const homeTeam = pred.homeTeam || 'N/A';
-            const awayTeam = pred.awayTeam || 'N/A';
+            const isCorrect = pred.isCorrect || false;
             
             let statusText = '';
             let statusColor = '';
@@ -515,6 +525,11 @@ async function loadMyPredictions() {
                 statusColor = '#ffc107';
             }
             
+            const homeTeam = match.homeTeam || pred.homeTeam || 'N/A';
+            const awayTeam = match.awayTeam || pred.awayTeam || 'N/A';
+            const matchDate = match.date || pred.matchDate || 'N/A';
+            
+            // Màu sắc cho card
             const cardColor = isProcessed ? 
                 (isCorrect ? '#d4edda' : '#f8d7da') : 
                 '#fff3cd';
@@ -527,12 +542,12 @@ async function loadMyPredictions() {
                     <div class="match-info">
                         <div class="match-teams">${homeTeam} vs ${awayTeam}</div>
                         <div class="match-meta">
-                            📅 ${matchDate} | ⚡ Kèo: ${pred.userHandicap || 0}
+                            📅 ${matchDate} | ⚡ Kèo: ${pred.userHandicap || match.handicap || 0}
                             <span style="margin-left: 10px; color: ${statusColor}; font-weight: 600;">${statusText}</span>
                         </div>
                         <div class="match-prediction">
-                            <strong>Dự đoán:</strong> ${pred.predictedHomeScore} - ${pred.predictedAwayScore}
-                            ${isProcessed ? ` | <strong>Kết quả:</strong> ${pred.actualHomeScore} - ${pred.actualAwayScore}` : ''}
+                            <strong>Dự đoán:</strong> ${pred.homeScore} - ${pred.awayScore}
+                            ${isProcessed ? ` | <strong>Kết quả:</strong> ${match.homeScore !== undefined ? match.homeScore : '?'} - ${match.awayScore !== undefined ? match.awayScore : '?'}` : ''}
                             ${isProcessed ? `<span class="${isCorrect ? 'correct' : 'wrong'}" style="margin-left:10px;">${isCorrect ? '✅ Đúng' : '❌ Sai'}</span>` : ''}
                         </div>
                     </div>
@@ -543,20 +558,10 @@ async function loadMyPredictions() {
             `;
         });
         
-        if (!hasHistory) {
-            html = `
-                <div style="background: #e8f4fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #17a2b8;">
-                    <p style="margin: 0; color: #0c5460;">
-                        ℹ️ <strong>Lưu ý:</strong> Các dự đoán của bạn sẽ được tính điểm sau khi trận đấu kết thúc và admin nhập kết quả.
-                    </p>
-                </div>
-                ${html}
-            `;
-        }
-        
         const accuracy = totalPredictions > 0 ? Math.round((correctCount / totalPredictions) * 100) : 0;
         
-        html = `
+        // Thống kê
+        const statsHtml = `
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:20px;">
                 <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
                     <div style="font-size:24px;font-weight:bold;color:#667eea;">${totalPredictions}</div>
@@ -575,13 +580,110 @@ async function loadMyPredictions() {
                     <div style="color:#888;font-size:14px;">Tổng điểm</div>
                 </div>
             </div>
-            ${html}
         `;
         
-        container.innerHTML = html;
+        container.innerHTML = statsHtml + html;
         
     } catch (error) {
         console.error('❌ Lỗi load predictions:', error);
+        
+        // Nếu lỗi index, thử lấy không orderBy
+        if (error.message && error.message.includes('index')) {
+            try {
+                const snapshot = await db.collection('predictions')
+                    .where('userId', '==', user.uid)
+                    .get();
+                
+                if (!snapshot.empty) {
+                    // Xử lý tương tự như trên nhưng không orderBy
+                    const matchesSnapshot = await db.collection('matches').get();
+                    const matchesMap = {};
+                    matchesSnapshot.forEach(doc => {
+                        matchesMap[doc.id] = doc.data();
+                    });
+                    
+                    let html = '';
+                    let totalPoints = 0;
+                    let correctCount = 0;
+                    let totalPredictions = 0;
+                    
+                    const predictions = [];
+                    snapshot.forEach(doc => {
+                        predictions.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    predictions.forEach(pred => {
+                        // ... xử lý tương tự
+                        const match = matchesMap[pred.matchId] || {};
+                        totalPredictions++;
+                        totalPoints += pred.points || 0;
+                        if (pred.isCorrect) correctCount++;
+                        
+                        const isProcessed = pred.isProcessed || false;
+                        const isCorrect = pred.isCorrect || false;
+                        
+                        let statusText = isProcessed ? (isCorrect ? '✅ Đúng' : '❌ Sai') : '⏳ Chờ xử lý';
+                        let statusColor = isProcessed ? (isCorrect ? '#28a745' : '#dc3545') : '#ffc107';
+                        
+                        const homeTeam = match.homeTeam || pred.homeTeam || 'N/A';
+                        const awayTeam = match.awayTeam || pred.awayTeam || 'N/A';
+                        const matchDate = match.date || pred.matchDate || 'N/A';
+                        
+                        const cardColor = isProcessed ? (isCorrect ? '#d4edda' : '#f8d7da') : '#fff3cd';
+                        const borderColor = isProcessed ? (isCorrect ? '#28a745' : '#dc3545') : '#ffc107';
+                        
+                        html += `
+                            <div class="result-item" style="border-left-color: ${borderColor}; background: ${cardColor};">
+                                <div class="match-info">
+                                    <div class="match-teams">${homeTeam} vs ${awayTeam}</div>
+                                    <div class="match-meta">
+                                        📅 ${matchDate} | ⚡ Kèo: ${pred.userHandicap || match.handicap || 0}
+                                        <span style="margin-left: 10px; color: ${statusColor}; font-weight: 600;">${statusText}</span>
+                                    </div>
+                                    <div class="match-prediction">
+                                        <strong>Dự đoán:</strong> ${pred.homeScore} - ${pred.awayScore}
+                                        ${isProcessed ? ` | <strong>Kết quả:</strong> ${match.homeScore !== undefined ? match.homeScore : '?'} - ${match.awayScore !== undefined ? match.awayScore : '?'}` : ''}
+                                        ${isProcessed ? `<span class="${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✅ Đúng' : '❌ Sai'}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="match-score ${isCorrect ? 'win' : (isProcessed ? 'lose' : '')}">
+                                    ${isProcessed ? (isCorrect ? '+1' : '0') : '⏳'} điểm
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    const accuracy = totalPredictions > 0 ? Math.round((correctCount / totalPredictions) * 100) : 0;
+                    
+                    const statsHtml = `
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:20px;">
+                            <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                                <div style="font-size:24px;font-weight:bold;color:#667eea;">${totalPredictions}</div>
+                                <div style="color:#888;font-size:14px;">Tổng dự đoán</div>
+                            </div>
+                            <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                                <div style="font-size:24px;font-weight:bold;color:#28a745;">${correctCount}</div>
+                                <div style="color:#888;font-size:14px;">Dự đoán đúng</div>
+                            </div>
+                            <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                                <div style="font-size:24px;font-weight:bold;color:#fdcb6e;">${accuracy}%</div>
+                                <div style="color:#888;font-size:14px;">Tỷ lệ đúng</div>
+                            </div>
+                            <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                                <div style="font-size:24px;font-weight:bold;color:#764ba2;">${totalPoints}</div>
+                                <div style="color:#888;font-size:14px;">Tổng điểm</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    container.innerHTML = statsHtml + html;
+                    return;
+                }
+            } catch (fallbackError) {
+                console.error('❌ Fallback error:', fallbackError);
+            }
+        }
+        
         container.innerHTML = `<p style="color:red; text-align:center; padding: 20px;">❌ Lỗi: ${error.message}</p>`;
     }
 }
