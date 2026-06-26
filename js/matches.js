@@ -7,6 +7,9 @@ class MatchManager {
         this.predictionsListener = null;
     }
 
+    // ============================================
+    // LẮNG NGHE DỮ LIỆU TRẬN ĐẤU
+    // ============================================
     listenMatches() {
         console.log('📡 Bắt đầu lắng nghe matches...');
         if (!db) {
@@ -34,12 +37,6 @@ class MatchManager {
                     `<p style="color:red;">❌ Lỗi tải dữ liệu: ${error.message}</p>`;
             });
 
-        // Lắng nghe thay đổi dự đoán để cập nhật UI
-        const user = firebase.auth().currentUser;
-        if (user) {
-            this.listenPredictions(user.uid);
-        }
-
         // Lắng nghe thay đổi auth state
         firebase.auth().onAuthStateChanged((user) => {
             if (this.predictionsListener) {
@@ -51,8 +48,17 @@ class MatchManager {
             }
             this.renderMatches();
         });
+
+        // Nếu đã có user, lắng nghe dự đoán
+        const user = firebase.auth().currentUser;
+        if (user) {
+            this.listenPredictions(user.uid);
+        }
     }
 
+    // ============================================
+    // LẮNG NGHE DỰ ĐOÁN CỦA USER
+    // ============================================
     listenPredictions(userId) {
         if (!userId) return;
         
@@ -68,6 +74,9 @@ class MatchManager {
             });
     }
 
+    // ============================================
+    // HIỂN THỊ DANH SÁCH TRẬN ĐẤU
+    // ============================================
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -80,7 +89,7 @@ class MatchManager {
         const user = firebase.auth().currentUser;
         
         const renderWithPredictions = (predictions) => {
-            // Tạo map dự đoán theo matchId để kiểm tra nhanh
+            // Tạo map dự đoán theo matchId
             const predictionMap = {};
             predictions.forEach(p => {
                 predictionMap[p.matchId] = p;
@@ -88,6 +97,7 @@ class MatchManager {
             
             console.log('📊 Số dự đoán của user:', Object.keys(predictionMap).length);
             
+            // Nhóm trận đấu theo bảng
             const groupedMatches = this.matches.reduce((groups, match) => {
                 const group = match.group || 'Chưa xếp bảng';
                 if (!groups[group]) {
@@ -135,7 +145,6 @@ class MatchManager {
                     
                     if (!isFinished) {
                         if (isPredicted) {
-                            // Cho phép cập nhật dự đoán
                             buttonHtml = `
                                 <button class="predict-btn predicted" onclick="updatePrediction('${match.id}')" style="background: #17a2b8;">
                                     🔄 Cập nhật
@@ -203,6 +212,7 @@ class MatchManager {
             container.innerHTML = html;
         };
 
+        // Lấy dự đoán của user
         if (user) {
             db.collection('predictions')
                 .where('userId', '==', user.uid)
@@ -304,23 +314,26 @@ class MatchManager {
 
                 const userRef = db.collection('users').doc(userId);
                 
+                // Lấy thông tin user hiện tại
+                const userDoc = await userRef.get();
+                const userData = userDoc.exists ? userDoc.data() : {};
+                
                 if (result.points > 0) {
                     batch.update(userRef, {
                         balance: firebase.firestore.FieldValue.increment(result.points),
                         totalPoints: firebase.firestore.FieldValue.increment(result.points),
                         correctPredictions: firebase.firestore.FieldValue.increment(1),
-                        totalPredictions: firebase.firestore.FieldValue.increment(1),
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     totalCorrect++;
                     totalPoints += result.points;
                 } else {
                     batch.update(userRef, {
-                        totalPredictions: firebase.firestore.FieldValue.increment(1),
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }
 
+                // Lưu lịch sử dự đoán
                 const historyData = {
                     userId: userId,
                     matchId: matchId,
@@ -388,6 +401,7 @@ class MatchManager {
                 console.log(`  👤 ${r.userName}: ${r.points} điểm - ${r.detail}`);
             });
 
+            // Cập nhật lại bảng xếp hạng
             if (window.statisticsManager) {
                 await window.statisticsManager.loadRanking();
             }
@@ -550,6 +564,9 @@ class MatchManager {
         }
     }
 
+    // ============================================
+    // HIỂN THỊ MODAL CHI TIẾT
+    // ============================================
     showMatchDetailModal(match, prediction, resultInfo) {
         const modalHtml = `
             <div id="matchDetailModal" class="modal" style="display:block;">
@@ -643,9 +660,13 @@ class MatchManager {
         }, 100);
     }
 
+    // ============================================
+    // DỪNG LẮNG NGHE
+    // ============================================
     stopListening() {
         if (this.unsubscribe) {
             this.unsubscribe();
+            this.unsubscribe = null;
         }
         if (this.predictionsListener) {
             this.predictionsListener();
@@ -654,11 +675,15 @@ class MatchManager {
     }
 }
 
+// ============================================
+// HÀM GLOBAL
+// ============================================
 async function viewMatchHistory(matchId) {
     const matchManager = new MatchManager();
     await matchManager.viewMatchHistory(matchId);
 }
 
+// Export cho các file khác sử dụng
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = MatchManager;
 }

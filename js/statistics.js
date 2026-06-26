@@ -1,4 +1,4 @@
-// js/statistics.js - CẬP NHẬT HÀM renderDailyStats
+// js/statistics.js - SỬA LẠI TOÀN BỘ
 
 class StatisticsManager {
     async loadRanking() {
@@ -6,23 +6,23 @@ class StatisticsManager {
         try {
             const db = firebase.firestore();
             
-            // Lấy tất cả users
+            // 1. Lấy tất cả users
             const usersSnapshot = await db.collection('users')
                 .orderBy('totalPoints', 'desc')
                 .get();
 
-            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
+            // 2. Lấy tất cả dự đoán đã xử lý (isProcessed = true)
             const predictionsSnapshot = await db.collection('predictions')
                 .where('isProcessed', '==', true)
                 .get();
-            
-            // Tạo map để đếm dự đoán đúng và tổng điểm
-            const userStats = {};
+
+            // 3. Tạo map thống kê từ dự đoán
+            const statsMap = {};
             
             // Khởi tạo stats cho từng user
             usersSnapshot.forEach(doc => {
                 const data = doc.data();
-                userStats[doc.id] = {
+                statsMap[doc.id] = {
                     id: doc.id,
                     name: data.nickname || data.name || data.email || 'Anonymous',
                     totalPoints: data.totalPoints || 0,
@@ -31,27 +31,31 @@ class StatisticsManager {
                     balance: data.balance || 0
                 };
             });
-            
-            // Đếm dự đoán đúng và tổng điểm từ predictions
+
+            // Cập nhật thống kê từ dự đoán đã xử lý
             predictionsSnapshot.forEach(doc => {
                 const pred = doc.data();
                 const userId = pred.userId;
                 
-                if (userStats[userId]) {
-                    // Chỉ đếm nếu dự đoán đúng
+                if (statsMap[userId]) {
+                    // Đếm tổng dự đoán đã xử lý
+                    statsMap[userId].totalPredictions = (statsMap[userId].totalPredictions || 0) + 1;
+                    
+                    // Đếm dự đoán đúng
                     if (pred.isCorrect) {
-                        // Không cần tăng vì đã có trong user data
+                        statsMap[userId].correctPredictions = (statsMap[userId].correctPredictions || 0) + 1;
+                        statsMap[userId].totalPoints = (statsMap[userId].totalPoints || 0) + (pred.points || 1);
                     }
-                    // totalPredictions đã có trong user data
                 }
             });
-            
+
             // Chuyển thành array và sắp xếp
-            const ranking = Object.values(userStats);
+            const ranking = Object.values(statsMap);
             ranking.sort((a, b) => b.totalPoints - a.totalPoints);
 
             this.renderRanking(ranking);
             await this.renderDailyStats();
+            
         } catch (error) {
             console.error('❌ Lỗi tải bảng xếp hạng:', error);
             document.getElementById('rankingTable').innerHTML = 
@@ -137,7 +141,7 @@ class StatisticsManager {
                 return;
             }
 
-            // Lấy tất cả dự đoán đã xử lý (isProcessed = true)
+            // Lấy tất cả dự đoán đã xử lý
             const predictionsSnap = await db.collection('predictions')
                 .where('isProcessed', '==', true)
                 .get();
@@ -219,6 +223,59 @@ class StatisticsManager {
         } catch (error) {
             console.error('❌ Lỗi tải thống kê ngày:', error);
             container.innerHTML = `<p style="color:red;">❌ Lỗi: ${error.message}</p>`;
+        }
+    }
+
+    // THÊM HÀM ĐỒNG BỘ
+    async syncAllData() {
+        console.log('🔄 Đang đồng bộ dữ liệu...');
+        try {
+            const db = firebase.firestore();
+            
+            // Lấy tất cả dự đoán đã xử lý
+            const predictionsSnap = await db.collection('predictions')
+                .where('isProcessed', '==', true)
+                .get();
+            
+            // Thống kê lại từ đầu
+            const stats = {};
+            
+            for (const doc of predictionsSnap.docs) {
+                const pred = doc.data();
+                const userId = pred.userId;
+                
+                if (!stats[userId]) {
+                    stats[userId] = {
+                        totalPredictions: 0,
+                        correctPredictions: 0,
+                        totalPoints: 0
+                    };
+                }
+                
+                stats[userId].totalPredictions++;
+                if (pred.isCorrect) {
+                    stats[userId].correctPredictions++;
+                    stats[userId].totalPoints += (pred.points || 0);
+                }
+            }
+            
+            // Cập nhật lại user
+            const batch = db.batch();
+            for (const [userId, data] of Object.entries(stats)) {
+                const userRef = db.collection('users').doc(userId);
+                batch.update(userRef, {
+                    totalPredictions: data.totalPredictions,
+                    correctPredictions: data.correctPredictions,
+                    totalPoints: data.totalPoints
+                });
+            }
+            await batch.commit();
+            
+            console.log('✅ Đồng bộ dữ liệu thành công!');
+            await this.loadRanking();
+            
+        } catch (error) {
+            console.error('❌ Lỗi đồng bộ:', error);
         }
     }
 }

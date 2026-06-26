@@ -18,13 +18,21 @@ class PredictionManager {
                 .where('userId', '==', window.currentUserId)
                 .get();
 
+            // Nếu đã có dự đoán, hỏi cập nhật
             if (!existing.empty) {
                 if (!confirm('Bạn đã dự đoán trận này. Bạn có muốn cập nhật dự đoán mới?')) {
                     return;
                 }
+                // Xóa dự đoán cũ
                 const batch = db.batch();
                 existing.forEach(doc => batch.delete(doc.ref));
                 await batch.commit();
+                
+                // Giảm totalPredictions
+                const userRef = db.collection('users').doc(window.currentUserId);
+                await userRef.update({
+                    totalPredictions: firebase.firestore.FieldValue.increment(-1)
+                });
             }
 
             // Lấy thông tin trận đấu
@@ -57,9 +65,12 @@ class PredictionManager {
 
             alert('✅ Dự đoán thành công!');
             
-            // Reload matches để cập nhật giao diện
+            // Reload matches và ranking
             if (window.matchManager) {
                 window.matchManager.renderMatches();
+            }
+            if (window.statisticsManager) {
+                await window.statisticsManager.loadRanking();
             }
             
             this.loadPredictions();
