@@ -33,6 +33,7 @@ class MatchManager {
             });
     }
 
+    // js/matches.js - CẬP NHẬT HÀM renderMatches
     renderMatches() {
         const container = document.getElementById('matchList');
         if (!container) return;
@@ -42,83 +43,130 @@ class MatchManager {
             return;
         }
 
-        const groupedMatches = this.matches.reduce((groups, match) => {
-            const group = match.group || 'Chưa xếp bảng';
-            if (!groups[group]) {
-                groups[group] = [];
+        // Lấy danh sách dự đoán của user hiện tại để đánh dấu
+        const user = firebase.auth().currentUser;
+        let userPredictions = [];
+        
+        // Hàm lấy dự đoán của user (sử dụng biến toàn cục hoặc lấy từ Firestore)
+        async function getUserPredictions() {
+            if (!user) return [];
+            try {
+                const snapshot = await db.collection('predictions')
+                    .where('userId', '==', user.uid)
+                    .get();
+                const preds = [];
+                snapshot.forEach(doc => preds.push(doc.data()));
+                return preds;
+            } catch (e) {
+                console.error('Lỗi lấy dự đoán:', e);
+                return [];
             }
-            groups[group].push(match);
-            return groups;
-        }, {});
-
-        let html = '';
-        const sortedGroups = Object.keys(groupedMatches).sort();
-
-        for (const groupName of sortedGroups) {
-            const matches = groupedMatches[groupName];
-            
-            html += `
-                <div class="group-section">
-                    <div class="group-header">
-                        <h3 class="group-title">🏆 ${groupName}</h3>
-                        <span class="group-count">${matches.length} trận</span>
-                    </div>
-                    <div class="match-grid">
-            `;
-
-            matches.forEach(match => {
-                const isFinished = match.status === 'finished';
-                const isLoggedIn = !!window.currentUserId;
-                const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
-                
-                html += `
-                    <div class="match-card">
-                        <div class="match-header">
-                            <div class="match-info">
-                                <span class="team">${match.homeTeam || '?'}</span>
-                                <span class="vs">vs</span>
-                                <span class="team">${match.awayTeam || '?'}</span>
-                            </div>
-                            <div class="match-badge">
-                                <span class="match-status-badge ${isFinished ? 'finished' : 'upcoming'}">
-                                    ${isFinished ? '✅ Đã kết thúc' : '⏳ Sắp diễn ra'}
-                                </span>
-                                ${match.group ? `<span class="group-badge">${match.group}</span>` : ''}
-                            </div>
-                        </div>
-                        <div class="match-details">
-                            <span>📅 ${match.date || 'N/A'}</span>
-                            <span>⏰ ${match.time || 'N/A'}</span>
-                            <span>${handicapDisplay}</span>
-                            ${match.stage ? `<span>🏷️ ${match.stage}</span>` : ''}
-                        </div>
-                        <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
-                            ${isFinished ? 
-                                `${match.homeScore} - ${match.awayScore} 🏆` : 
-                                '⏳ Chưa diễn ra'}
-                        </div>
-                        ${!isFinished ? `
-                            <button class="predict-btn" onclick="predictMatch('${match.id}')" 
-                                    ${!isLoggedIn ? 'disabled' : ''}>
-                                ${isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán'}
-                            </button>
-                        ` : `
-                            <button class="predict-btn" onclick="viewMatchHistory('${match.id}')" 
-                                    style="background: linear-gradient(135deg, #00b894, #00a86b);">
-                                📊 Xem chi tiết
-                            </button>
-                        `}
-                    </div>
-                `;
-            });
-
-            html += `
-                    </div>
-                </div>
-            `;
         }
 
-        container.innerHTML = html;
+        // Lấy dự đoán và render
+        getUserPredictions().then(predictions => {
+            const predictedMatchIds = predictions.map(p => p.matchId);
+            
+            const groupedMatches = this.matches.reduce((groups, match) => {
+                const group = match.group || 'Chưa xếp bảng';
+                if (!groups[group]) {
+                    groups[group] = [];
+                }
+                groups[group].push(match);
+                return groups;
+            }, {});
+
+            let html = '';
+            const sortedGroups = Object.keys(groupedMatches).sort();
+
+            for (const groupName of sortedGroups) {
+                const matches = groupedMatches[groupName];
+                
+                html += `
+                    <div class="group-section">
+                        <div class="group-header">
+                            <h3 class="group-title">🏆 ${groupName}</h3>
+                            <span class="group-count">${matches.length} trận</span>
+                        </div>
+                        <div class="match-grid">
+                `;
+
+                matches.forEach(match => {
+                    const isFinished = match.status === 'finished';
+                    const isLoggedIn = !!window.currentUserId;
+                    const handicapDisplay = match.handicap > 0 ? `⚡ Chấp ${match.handicap}` : '⚡ Đồng banh';
+                    const isPredicted = predictedMatchIds.includes(match.id);
+                    
+                    // Màu sắc cho card dựa trên trạng thái
+                    let cardClass = '';
+                    let badgeText = '';
+                    let badgeColor = '';
+                    
+                    if (isPredicted) {
+                        cardClass = 'match-predicted';
+                        badgeText = '📝 Đã dự đoán';
+                        badgeColor = '#17a2b8';
+                    } else if (isFinished) {
+                        cardClass = 'match-finished';
+                    } else {
+                        cardClass = 'match-upcoming';
+                    }
+                    
+                    html += `
+                        <div class="match-card ${cardClass}" style="${isPredicted ? 'border-left: 4px solid #17a2b8; background: #f0f8ff;' : ''}">
+                            ${isPredicted ? `
+                                <div style="position: absolute; top: 10px; right: 10px; background: #17a2b8; color: white; padding: 2px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;">
+                                    ${badgeText}
+                                </div>
+                            ` : ''}
+                            <div class="match-header">
+                                <div class="match-info">
+                                    <span class="team">${match.homeTeam || '?'}</span>
+                                    <span class="vs">vs</span>
+                                    <span class="team">${match.awayTeam || '?'}</span>
+                                </div>
+                                <div class="match-badge">
+                                    <span class="match-status-badge ${isFinished ? 'finished' : 'upcoming'}">
+                                        ${isFinished ? '✅ Đã kết thúc' : '⏳ Sắp diễn ra'}
+                                    </span>
+                                    ${match.group ? `<span class="group-badge">${match.group}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="match-details">
+                                <span>📅 ${match.date || 'N/A'}</span>
+                                <span>⏰ ${match.time || 'N/A'}</span>
+                                <span>${handicapDisplay}</span>
+                                ${match.stage ? `<span>🏷️ ${match.stage}</span>` : ''}
+                            </div>
+                            <div class="match-score ${isFinished ? 'finished' : 'upcoming'}">
+                                ${isFinished ? 
+                                    `${match.homeScore} - ${match.awayScore} 🏆` : 
+                                    '⏳ Chưa diễn ra'}
+                            </div>
+                            ${!isFinished ? `
+                                <button class="predict-btn ${isPredicted ? 'predicted' : ''}" 
+                                        onclick="predictMatch('${match.id}')" 
+                                        ${!isLoggedIn || isPredicted ? 'disabled' : ''}
+                                        style="${isPredicted ? 'background: #17a2b8; opacity: 0.7; cursor: not-allowed;' : ''}">
+                                    ${isPredicted ? '✅ Đã dự đoán' : (isLoggedIn ? '📝 Dự Đoán' : '🔒 Đăng nhập để dự đoán')}
+                                </button>
+                            ` : `
+                                <button class="predict-btn detail-btn" onclick="viewMatchHistory('${match.id}')">
+                                    📊 Xem chi tiết
+                                </button>
+                            `}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        });
     }
 
     // ============================================

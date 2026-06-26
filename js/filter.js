@@ -458,31 +458,28 @@ async function loadMyPredictions() {
     try {
         const db = firebase.firestore();
         
-        // ⚠️ THỬ LẤY DỮ LIỆU VỚI ORDER BY
+        // Lấy tất cả dự đoán của user
         let snapshot;
         try {
-            snapshot = await db.collection('user_predictions_history')
+            snapshot = await db.collection('predictions')
                 .where('userId', '==', user.uid)
-                .orderBy('createdAt', 'desc')
+                .orderBy('timestamp', 'desc')
                 .get();
         } catch (orderError) {
-            // Nếu lỗi do thiếu index, thử lấy không orderBy
             if (orderError.message && orderError.message.includes('index')) {
                 console.warn('⚠️ Thiếu index, đang lấy dữ liệu không sắp xếp...');
-                snapshot = await db.collection('user_predictions_history')
+                snapshot = await db.collection('predictions')
                     .where('userId', '==', user.uid)
                     .get();
                 
-                // Sắp xếp thủ công trong JavaScript
                 const docs = [];
                 snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
                 docs.sort((a, b) => {
-                    const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
-                    const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+                    const timeA = a.timestamp?.toDate?.()?.getTime() || 0;
+                    const timeB = b.timestamp?.toDate?.()?.getTime() || 0;
                     return timeB - timeA;
                 });
                 
-                // Tạo snapshot giả để render
                 const fakeSnapshot = {
                     empty: docs.length === 0,
                     forEach: (callback) => docs.forEach(d => callback({ id: d.id, data: () => d }))
@@ -504,38 +501,47 @@ async function loadMyPredictions() {
             return;
         }
         
+        // Lấy danh sách trận đấu để hiển thị thông tin
+        const matchesSnapshot = await db.collection('matches').get();
+        const matchesMap = {};
+        matchesSnapshot.forEach(doc => {
+            matchesMap[doc.id] = doc.data();
+        });
+        
         let html = '';
         let totalPoints = 0;
         let correctCount = 0;
         let totalPredictions = 0;
+        let hasHistory = false;
         
         snapshot.forEach(doc => {
             const pred = doc.data();
+            const matchId = pred.matchId;
+            const match = matchesMap[matchId] || {};
+            
+            // Cập nhật thống kê
             totalPoints += pred.points || 0;
             if (pred.isCorrect) correctCount++;
             totalPredictions++;
             
-            const isCorrect = pred.isCorrect;
-            
-            // Tìm bảng của đội
-            let groupDisplay = '';
-            if (typeof TEAM_TO_GROUP !== 'undefined') {
-                const homeGroup = TEAM_TO_GROUP[pred.homeTeam];
-                const awayGroup = TEAM_TO_GROUP[pred.awayTeam];
-                if (homeGroup && homeGroup === awayGroup) {
-                    groupDisplay = `🏆 ${homeGroup}`;
-                } else if (homeGroup) {
-                    groupDisplay = `🏆 ${homeGroup}`;
-                } else if (awayGroup) {
-                    groupDisplay = `🏆 ${awayGroup}`;
-                }
+            // Kiểm tra nếu có lịch sử (đã xử lý)
+            if (pred.isProcessed) {
+                hasHistory = true;
             }
             
-            // Xác định trạng thái dự đoán
+            const isCorrect = pred.isCorrect || false;
+            const isProcessed = pred.isProcessed || false;
+            const matchDate = match.date || 'N/A';
+            const homeTeam = match.homeTeam || pred.homeTeam || 'N/A';
+            const awayTeam = match.awayTeam || pred.awayTeam || 'N/A';
+            const actualHomeScore = match.homeScore !== undefined && match.homeScore !== null ? match.homeScore : '?';
+            const actualAwayScore = match.awayScore !== undefined && match.awayScore !== null ? match.awayScore : '?';
+            
+            // Xác định trạng thái
             let statusText = '';
             let statusColor = '';
-            if (pred.isProcessed !== undefined) {
-                if (pred.isCorrect) {
+            if (isProcessed) {
+                if (isCorrect) {
                     statusText = '✅ Đúng';
                     statusColor = '#28a745';
                 } else {
@@ -547,30 +553,66 @@ async function loadMyPredictions() {
                 statusColor = '#ffc107';
             }
             
+            // Tìm bảng của đội
+            let groupDisplay = '';
+            if (typeof TEAM_TO_GROUP !== 'undefined') {
+                const homeGroup = TEAM_TO_GROUP[homeTeam];
+                const awayGroup = TEAM_TO_GROUP[awayTeam];
+                if (homeGroup && homeGroup === awayGroup) {
+                    groupDisplay = `🏆 ${homeGroup}`;
+                } else if (homeGroup) {
+                    groupDisplay = `🏆 ${homeGroup}`;
+                } else if (awayGroup) {
+                    groupDisplay = `🏆 ${awayGroup}`;
+                }
+            }
+            
+            // Màu sắc cho card dự đoán
+            const cardColor = isProcessed ? 
+                (isCorrect ? '#d4edda' : '#f8d7da') : 
+                '#fff3cd';
+            const borderColor = isProcessed ? 
+                (isCorrect ? '#28a745' : '#dc3545') : 
+                '#ffc107';
+            
             html += `
-                <div class="result-item" style="border-left-color: ${isCorrect ? '#28a745' : '#dc3545'}">
+                <div class="result-item" style="border-left-color: ${borderColor}; background: ${cardColor};">
                     <div class="match-info">
-                        <div class="match-teams">${pred.homeTeam || 'N/A'} vs ${pred.awayTeam || 'N/A'}</div>
+                        <div class="match-teams">${homeTeam} vs ${awayTeam}</div>
                         <div class="match-meta">
-                            📅 ${pred.matchDate || 'N/A'} | ⚡ Kèo: ${pred.userHandicap || 0}
+                            📅 ${matchDate} | ⚡ Kèo: ${pred.userHandicap || match.handicap || 0}
                             ${groupDisplay ? ` | ${groupDisplay}` : ''}
                             <span style="margin-left: 10px; color: ${statusColor}; font-weight: 600;">${statusText}</span>
                         </div>
                         <div class="match-prediction">
-                            Dự đoán: ${pred.predictedHomeScore} - ${pred.predictedAwayScore} | 
-                            Kết quả: ${pred.actualHomeScore !== undefined ? pred.actualHomeScore : '?'} - ${pred.actualAwayScore !== undefined ? pred.actualAwayScore : '?'}
-                            <span class="${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✅ Đúng' : '❌ Sai'}</span>
+                            <strong>Dự đoán của bạn:</strong> ${pred.homeScore} - ${pred.awayScore}
+                            ${isProcessed ? ` | <strong>Kết quả:</strong> ${actualHomeScore} - ${actualAwayScore}` : ''}
+                            ${isProcessed ? `<span class="${isCorrect ? 'correct' : 'wrong'}" style="margin-left:10px;">${isCorrect ? '✅ Đúng' : '❌ Sai'}</span>` : ''}
                         </div>
                     </div>
-                    <div class="match-score ${isCorrect ? 'win' : 'lose'}">
-                        ${pred.points || 0} điểm
+                    <div class="match-score ${isCorrect ? 'win' : (isProcessed ? 'lose' : '')}">
+                        ${isProcessed ? (isCorrect ? '+1' : '0') : '⏳'} điểm
                     </div>
                 </div>
             `;
         });
         
+        // Nếu chưa có lịch sử nào (chưa có trận nào được xử lý)
+        if (!hasHistory) {
+            // Vẫn hiển thị dự đoán nhưng thêm thông báo
+            html = `
+                <div style="background: #e8f4fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #17a2b8;">
+                    <p style="margin: 0; color: #0c5460;">
+                        ℹ️ <strong>Lưu ý:</strong> Các dự đoán của bạn sẽ được tính điểm sau khi trận đấu kết thúc và admin nhập kết quả.
+                    </p>
+                </div>
+                ${html}
+            `;
+        }
+        
         const accuracy = totalPredictions > 0 ? Math.round((correctCount / totalPredictions) * 100) : 0;
         
+        // Thêm thống kê
         html = `
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:20px;">
                 <div style="background:white;padding:15px;border-radius:10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
@@ -597,11 +639,8 @@ async function loadMyPredictions() {
         
     } catch (error) {
         console.error('❌ Lỗi load predictions:', error);
-        
-        // Kiểm tra lỗi index
         if (error.message && error.message.includes('index')) {
             const indexLink = error.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
-            
             container.innerHTML = `
                 <div class="no-results" style="padding: 30px; text-align: center;">
                     <div class="icon" style="font-size: 48px; margin-bottom: 15px;">🔧</div>
@@ -609,9 +648,7 @@ async function loadMyPredictions() {
                     <p style="color: #666; margin-bottom: 15px;">
                         Hệ thống đang tạo chỉ mục để hiển thị lịch sử dự đoán. Vui lòng thử lại sau vài phút.
                     </p>
-                    <a href="${indexLink || '#'}" 
-                       target="_blank" 
-                       style="display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                    <a href="${indexLink || '#'}" target="_blank" style="display: inline-block; padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">
                         📊 Tạo chỉ mục
                     </a>
                     <p style="color: #999; font-size: 12px; margin-top: 10px;">

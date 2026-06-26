@@ -1087,3 +1087,86 @@ section h2 {
     font-size: 48px;
     margin-bottom: 15px;
 }
+/* style.css - THÊM VÀO CUỐI FILE */
+
+/* ============================================
+   MATCH PREDICTED
+   ============================================ */
+.match-predicted {
+    border-left: 4px solid #17a2b8 !important;
+    background: #f0f8ff !important;
+}
+
+.match-predicted .predict-btn.predicted {
+    background: #17a2b8 !important;
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+.match-predicted .predict-btn.predicted:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Badge đã dự đoán */
+.match-predicted-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #17a2b8;
+    color: white;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 10;
+}
+
+/* ============================================
+   PREDICTION HISTORY
+   ============================================ */
+.result-item.correct {
+    border-left-color: #28a745 !important;
+    background: #d4edda !important;
+}
+
+.result-item.wrong {
+    border-left-color: #dc3545 !important;
+    background: #f8d7da !important;
+}
+
+.result-item.pending {
+    border-left-color: #ffc107 !important;
+    background: #fff3cd !important;
+}
+
+.result-item .match-score.correct {
+    color: #28a745;
+}
+
+.result-item .match-score.wrong {
+    color: #dc3545;
+}
+
+.result-item .match-score.pending {
+    color: #ffc107;
+}
+
+/* ============================================
+   PREDICTED MATCHES IN SCHEDULE
+   ============================================ */
+.match-card.predicted {
+    border-left: 4px solid #17a2b8;
+    background: #f0f8ff;
+}
+
+.match-card.predicted .predict-btn:disabled {
+    background: #17a2b8;
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+.match-card.predicted .predict-btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
